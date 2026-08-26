@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>한국 고전 원문·번역 통합 탐색</title>
+<meta name="description" content="한국학중앙연구원, 승정원일기, 한국고전번역원 등 여러 기관의 한문 고전 원문·한글 번역 공개 데이터를 한 곳에서 검색·탐색합니다." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">文</span>
+    <div>
+      <h1>한국 고전 원문·번역 통합 탐색</h1>
+      <p>여러 기관의 공개 번역 데이터를 한 곳에서 검색합니다</p>
+    </div>
+  </div>
+</header>
+
+<nav class="sourceTabs" id="sourceTabs" role="tablist">
+  <button class="sourceTab active" data-source="all" role="tab" aria-selected="true">전체</button>
+</nav>
+
+<section class="stats" id="stats" aria-live="polite">
+  <div class="stat sourceBreakdown" id="sourceBreakdown"></div>
+</section>
+
+<section class="controls">
+  <input id="searchInput" type="search" autocomplete="off" placeholder="제목, 한문 제목, 저자/왕대로 검색" aria-label="검색" />
+  <select id="sortSelect" aria-label="정렬 기준">
+    <option value="title">제목순</option>
+    <option value="author">저자/왕대순</option>
+    <option value="date">연도/날짜순</option>
+    <option value="count-desc">기사 많은순</option>
+  </select>
+  <span id="resultCount" class="resultCount"></span>
+</section>
+
+<main>
+  <div id="grid" class="grid" role="list"></div>
+  <p id="emptyState" class="emptyState" hidden>검색 결과가 없습니다.</p>
+  <div id="sentinel" class="sentinel" aria-hidden="true"></div>
+</main>
+
+<footer>
+  <p>각 항목을 클릭하면 해당 기관 저장소의 원문·번역 페이지로 이동합니다. 이 페이지는 검색·탐색 색인만 제공합니다.</p>
+  <p><a href="https://kuclt.korea.ac.kr/kuclt/etc/link.do" target="_blank" rel="noopener">한국학 관련 기관 링크 모음 (고려대 민족문화연구원)</a> — 앞으로 이곳의 기관들을 순차적으로 통합할 예정입니다.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

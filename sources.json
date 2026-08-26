@@ -1,0 +1,46 @@
+[
+  {
+    "id": "aks",
+    "name": "한국학중앙연구원",
+    "description": "한국학 디지털 아카이브 고도서 한문 원문·한글 번역",
+    "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
+    "index_path": "_index/books.jsonl",
+    "status": "active",
+    "fields": {
+      "id": "book_id",
+      "title_ko": "title_ko",
+      "title_hanja": "title_hanja",
+      "subtitle": "author",
+      "date": "year",
+      "count": "published_article_count",
+      "path": "path"
+    }
+  },
+  {
+    "id": "sjw",
+    "name": "승정원일기",
+    "description": "국사편찬위원회 승정원일기 한문 원문·한글 번역",
+    "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
+    "index_path": "_index/sjw_articles.jsonl",
+    "status": "active",
+    "fields": {
+      "id": "article_id",
+      "title_ko": "title_ko",
+      "title_hanja": "title_hanja",
+      "subtitle": "king_name_ko",
+      "date": "issue_date_label",
+      "count": null,
+      "path": "path"
+    }
+  },
+  {
+    "id": "kotr",
+    "name": "한국고전번역원",
+    "description": "한국고전번역원 고전원문 한글 번역 (data.go.kr 공공데이터)",
+    "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
+    "index_path": null,
+    "stats_path": "_index/unified_stats.json",
+    "stats_key": "kotr",
+    "status": "in_progress"
+  }
+]
