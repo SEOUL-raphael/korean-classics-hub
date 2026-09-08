@@ -21,18 +21,18 @@
   {
     "id": "sjw",
     "name": "승정원일기",
-    "description": "국사편찬위원회 승정원일기 한문 원문·한글 번역",
+    "description": "국사편찬위원회 승정원일기 한문 원문·한글 번역 (날짜별 묶음)",
     "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
-    "index_path": "_index/sjw_articles.jsonl",
+    "index_path": "_index/sjw_days.jsonl",
     "reader": "article",
     "status": "active",
     "fields": {
-      "id": "article_id",
+      "id": "day_key",
       "title_ko": "title_ko",
       "title_hanja": "title_hanja",
       "subtitle": "king_name_ko",
       "date": "issue_date_label",
-      "count": null,
+      "count": "entry_count",
       "path": "path"
     }
   },
