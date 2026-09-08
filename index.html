@@ -26,7 +26,7 @@
   <div class="stat sourceBreakdown" id="sourceBreakdown"></div>
 </section>
 
-<section class="controls">
+<section class="controls" id="controls">
   <input id="searchInput" type="search" autocomplete="off" placeholder="제목, 한문 제목, 저자/왕대로 검색" aria-label="검색" />
   <select id="sortSelect" aria-label="정렬 기준">
     <option value="title">제목순</option>
@@ -38,13 +38,23 @@
 </section>
 
 <main>
-  <div id="grid" class="grid" role="list"></div>
-  <p id="emptyState" class="emptyState" hidden>검색 결과가 없습니다.</p>
-  <div id="sentinel" class="sentinel" aria-hidden="true"></div>
+  <div id="gridView">
+    <div id="grid" class="grid" role="list"></div>
+    <p id="emptyState" class="emptyState" hidden>검색 결과가 없습니다.</p>
+    <div id="sentinel" class="sentinel" aria-hidden="true"></div>
+  </div>
+
+  <div id="readerView" class="reader" hidden>
+    <button id="backLink" type="button" class="backBtn">← 목록으로</button>
+    <header id="readerHeader" class="readerHeader"></header>
+    <nav id="partTabs" class="partTabs" role="tablist"></nav>
+    <article id="readerContent" class="readerContent"></article>
+    <p id="readerSource" class="readerSource"></p>
+  </div>
 </main>
 
 <footer>
-  <p>각 항목을 클릭하면 해당 기관 저장소의 원문·번역 페이지로 이동합니다. 이 페이지는 검색·탐색 색인만 제공합니다.</p>
+  <p>각 항목을 클릭하면 이 페이지 안에서 원문·번역을 바로 읽을 수 있습니다(한국학중앙연구원·승정원일기). 준비 중인 출처는 통계만 표시됩니다.</p>
   <p><a href="https://kuclt.korea.ac.kr/kuclt/etc/link.do" target="_blank" rel="noopener">한국학 관련 기관 링크 모음 (고려대 민족문화연구원)</a> — 앞으로 이곳의 기관들을 순차적으로 통합할 예정입니다.</p>
 </footer>
 

@@ -63,6 +63,27 @@ body {
 .brand h1 { font-size: 1.1rem; margin: 0; }
 .brand p { font-size: 0.85rem; color: var(--muted); margin: 0.15rem 0 0; }
 
+.ghlink {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.ghlink:hover { text-decoration: underline; }
+
+.headerLinks { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+
+.stats {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.stat { display: flex; flex-direction: column; }
+.statValue { font-size: 1.4rem; font-weight: 700; }
+.statLabel { font-size: 0.8rem; color: var(--muted); }
+
 .sourceTabs {
   display: flex;
   gap: 0.5rem;
@@ -86,17 +107,16 @@ body {
   color: var(--accent-contrast);
 }
 
-.sourceTab.inProgress { opacity: 0.6; }
+.sourceTab.inProgress { opacity: 0.55; cursor: default; }
 
-.stats {
-  display: flex;
-  gap: 2rem;
-  padding: 1rem 1.5rem;
+.sourceBreakdown {
+  flex-direction: row;
+  gap: 0.6rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
-.sourceBreakdown { flex-direction: row; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
-.sourceBreakdown .chip { font-size: 0.78rem; }
+.sourceBreakdown .chip { font-size: 0.75rem; }
 
 .controls {
   display: flex;
@@ -155,7 +175,6 @@ main { padding: 0 1.5rem 2rem; }
   border-radius: 999px;
   padding: 0.05rem 0.5rem;
   margin-bottom: 0.3rem;
-  align-self: flex-start;
 }
 
 .cardTitle { font-weight: 700; font-size: 1rem; }
@@ -178,6 +197,7 @@ main { padding: 0 1.5rem 2rem; }
 }
 
 .emptyState { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+
 .sentinel { height: 1px; }
 
 footer {
@@ -186,4 +206,104 @@ footer {
   color: var(--muted);
   font-size: 0.8rem;
 }
-footer a { color: var(--accent); }
+
+/* Reader view */
+.reader {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.backBtn {
+  align-self: flex-start;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.backBtn:hover { text-decoration: underline; }
+
+.readerHeader {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.2rem 1.4rem;
+}
+
+.readerTitle { margin: 0 0 0.2rem; font-size: 1.3rem; }
+.readerHanja { margin: 0 0 0.5rem; color: var(--muted); }
+
+.partTabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.tab {
+  font: inherit;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.readerContent {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4rem 1.6rem;
+  overflow-wrap: break-word;
+}
+
+.readerContent h1 { font-size: 1.25rem; margin-top: 0; }
+.readerContent h2 { font-size: 1.1rem; margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+.readerContent h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.readerContent h3 { font-size: 0.95rem; color: var(--accent); margin-bottom: 0.3rem; }
+.readerContent p { margin: 0.3rem 0 0.8rem; }
+.readerContent ul { margin: 0 0 0.8rem; padding-left: 1.3rem; }
+.readerContent li { margin-bottom: 0.2rem; font-size: 0.9rem; }
+.readerContent hr { border: none; border-top: 1px dashed var(--border); margin: 1.4rem 0; }
+.readerContent code { background: var(--bg); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+.readerContent a { color: var(--accent); }
+
+.codeBlock {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+}
+.codeBlock code { background: none; padding: 0; }
+
+.tableWrap { overflow-x: auto; margin-bottom: 0.8rem; }
+.readerContent table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.readerContent th, .readerContent td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+.readerContent th { background: var(--bg); }
+
+.readerSource { font-size: 0.78rem; color: var(--muted); }
+.readerSource a { color: var(--muted); }
+
+.loading { color: var(--muted); padding: 1rem 0; }
