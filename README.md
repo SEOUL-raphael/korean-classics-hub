@@ -6,6 +6,9 @@
 
 - https://seoul-raphael.github.io/korean-classics-hub/
 
+이 페이지가 기본 진입점입니다. 기존 `aks-yoksa-mimo-proposal` 저장소의 첫 페이지도
+이제 이 통합 허브를 우선 링크로 안내합니다(데이터 자체는 계속 그 저장소에서 관리·공개).
+
 ## 구조
 
 - `sources.json`: 소스별 이름·데이터 위치·필드 매핑. 새 기관을 추가하려면 여기에 항목 하나만 더하면 됩니다
