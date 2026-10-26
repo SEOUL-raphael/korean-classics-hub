@@ -35,6 +35,24 @@
     "reader": "article",
     "status": "active",
     "date_sort_mode": "text",
+    "reign": {
+      "key_pattern": "^(SJW-[A-Z])(\\d{2})(\\d{2})(\\d)(\\d{2})",
+      "routine_pattern": "에 머묾",
+      "eras": [
+        { "prefix": "SJW-A", "king": "인조", "base": 1622 },
+        { "prefix": "SJW-B", "king": "효종", "base": 1649 },
+        { "prefix": "SJW-C", "king": "현종", "base": 1659 },
+        { "prefix": "SJW-D", "king": "숙종", "base": 1674 },
+        { "prefix": "SJW-E", "king": "경종", "base": 1720 },
+        { "prefix": "SJW-F", "king": "영조", "base": 1724 },
+        { "prefix": "SJW-G", "king": "정조", "base": 1776 },
+        { "prefix": "SJW-H", "king": "순조", "base": 1800 },
+        { "prefix": "SJW-I", "king": "헌종", "base": 1834 },
+        { "prefix": "SJW-J", "king": "철종", "base": 1849 },
+        { "prefix": "SJW-K", "king": "고종", "base": 1863 },
+        { "prefix": "SJW-L", "king": "순종", "base": 1906 }
+      ]
+    },
     "fields": {
       "id": "day_key",
       "title_ko": "title_ko",

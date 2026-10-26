@@ -37,7 +37,7 @@
         placeholder="제목·저자·왕대·연도 (예: 정조, 1782)" aria-label="목록 검색" aria-describedby="searchHint" />
       <kbd class="searchKey" aria-hidden="true">/</kbd>
     </div>
-    <label class="sortLabel">
+    <label class="sortLabel" id="sortLabel">
       <span class="visuallyHidden">정렬 기준</span>
       <select id="sortSelect">
         <option value="title">제목순</option>
@@ -54,6 +54,7 @@
 <main id="main" tabindex="-1">
   <div id="gridView">
     <div id="notice" class="notice" hidden></div>
+    <div id="browser" class="browser" hidden></div>
     <div id="grid" class="grid" aria-busy="true">
       <p class="loading">목록을 불러오는 중…</p>
     </div>
@@ -62,12 +63,27 @@
   </div>
 
   <div id="readerView" class="reader" hidden>
-    <button id="backLink" type="button" class="backBtn">← 목록으로</button>
+    <div class="readerTop">
+      <button id="backLink" type="button" class="backBtn">← 목록으로</button>
+      <nav id="readerCrumbs" class="crumbs" aria-label="현재 위치" hidden></nav>
+    </div>
     <header id="readerHeader" class="readerHeader"></header>
     <nav id="partTabs" class="partTabs" aria-label="책 구성"></nav>
-    <article id="readerContent" class="readerContent"></article>
-    <nav id="readerPager" class="readerPager" aria-label="묶음 이동" hidden></nav>
-    <p id="readerSource" class="readerSource"></p>
+    <div id="readerTools" class="readerTools" hidden>
+      <div class="segmented" role="group" aria-label="보기 방식">
+        <button type="button" data-view="both" aria-pressed="true">원문·번역 나란히</button>
+        <button type="button" data-view="ko" aria-pressed="false">번역만</button>
+        <button type="button" data-view="han" aria-pressed="false">원문만</button>
+      </div>
+    </div>
+    <div id="readerBody" class="readerBody">
+      <details id="readerToc" class="readerToc" hidden></details>
+      <div class="readerMain">
+        <article id="readerContent" class="readerContent"></article>
+        <nav id="readerPager" class="readerPager" aria-label="이전·다음" hidden></nav>
+        <p id="readerSource" class="readerSource"></p>
+      </div>
+    </div>
   </div>
 </main>
 

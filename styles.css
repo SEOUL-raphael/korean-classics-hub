@@ -409,6 +409,189 @@ details.articleMeta[open] summary { margin-bottom: 0.4rem; }
 .readerSource { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
 .readerSource a { color: var(--muted); }
 
+/* ---- Reign browser (승정원일기: 왕 → 해 → 달 → 날) ---- */
+.browser { display: flex; flex-direction: column; gap: 2rem; padding-top: 0.5rem; }
+.bSection { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; }
+.bHeadRow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; }
+.bHeading { margin: 0; font-size: 1.05rem; }
+.bNote { font-size: 0.82rem; color: var(--muted); }
+.bHint {
+  margin: 0; padding: 0.7rem 0.9rem; border-radius: 10px;
+  background: var(--accent-soft); font-size: 0.85rem; line-height: 1.6;
+}
+
+.kingRow { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.kingBtn {
+  flex: 1 1 150px; min-height: 44px; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  padding: 0.75rem 0.9rem; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit;
+}
+.kingBtn:hover { border-color: var(--accent); }
+.kingBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+.kingName { font-family: var(--font-classic); font-size: 1.3rem; font-weight: 700; }
+.kingSub { font-size: 0.78rem; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.kingGap {
+  flex: 0 1 150px; display: flex; flex-direction: column; justify-content: center; gap: 0.15rem;
+  padding: 0.6rem 0.8rem; border: 1.5px dashed var(--border); border-radius: 14px;
+  color: var(--muted); font-size: 0.78rem; line-height: 1.45;
+}
+
+.yearChartWrap {
+  overflow-x: auto; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 0.9rem 0.9rem 0.6rem;
+}
+.yearChart { display: flex; gap: 0.3rem; align-items: flex-end; min-width: min-content; }
+.yearBtn {
+  flex: 1 0 3.4rem; display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  padding: 0.35rem 0.1rem; border: none; border-radius: 10px; background: transparent;
+  font: inherit; color: var(--text); cursor: pointer;
+}
+.yearBtn:hover { background: var(--bg); }
+.yearBtn[aria-pressed="true"] { background: var(--accent-soft); }
+.yearDays, .yearAd { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.yearBar { width: 62%; min-height: 4px; background: var(--border); border-radius: 5px 5px 2px 2px; }
+.yearBtn:hover .yearBar { background: var(--muted); }
+.yearBtn[aria-pressed="true"] .yearBar { background: var(--accent); }
+.yearLabel { font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+
+.bCols { display: flex; flex-wrap: wrap; gap: 1.75rem; align-items: flex-start; }
+.bMonths { flex: 999 1 520px; }
+.bDays { flex: 1 1 340px; }
+.monthGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+.monthBtn {
+  text-align: left; display: flex; flex-direction: column; gap: 0.55rem; min-height: 44px;
+  padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+}
+.monthBtn:hover { border-color: var(--accent); }
+.monthBtn[aria-pressed="true"] { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+.monthTop { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.monthName { font-weight: 700; }
+.monthCount { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.monthDays { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.dayPill {
+  font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-left: auto; }
+.segmented button {
+  min-height: 40px; padding: 0 0.85rem; border: none; background: var(--surface);
+  color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer;
+}
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+.dayCard {
+  display: flex; flex-direction: column; gap: 0.45rem; padding: 0.95rem 1.1rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  text-decoration: none; color: inherit;
+}
+.dayCard:hover, .dayCard:focus-visible { border-color: var(--accent); }
+.dayTop { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.dayDate { font-weight: 700; font-size: 1.05rem; }
+.dayMeta { font-size: 0.8rem; color: var(--muted); }
+.dayGo { margin-left: auto; font-size: 0.85rem; font-weight: 700; color: var(--accent); }
+.dayHeadline { font-family: var(--font-classic); line-height: 1.6; }
+.dayRoutine { font-size: 0.78rem; color: var(--muted); }
+.dayRoutine:empty { display: none; }
+
+/* ---- Reader: breadcrumbs, tools, entries, TOC ---- */
+.readerTop { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.2rem; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.88rem; color: var(--muted); }
+.crumbs a { color: var(--muted); }
+.crumbs a:hover { color: var(--accent); }
+.crumbs [aria-current] { color: var(--text); }
+
+.readerTools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.readerTools .segmented { margin-left: 0; }
+
+.readerBody { display: block; }
+.readerMain { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+.readerToc {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.7rem 0.9rem; margin-bottom: 1rem; font-size: 0.88rem;
+}
+.readerToc summary { cursor: pointer; font-weight: 700; min-height: 28px; }
+.tocList { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.tocList button {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 0.05rem;
+  padding: 0.45rem 0.55rem; border: none; border-radius: 8px; background: transparent;
+  font: inherit; color: var(--text); cursor: pointer;
+}
+.tocList button:hover { background: var(--accent-soft); }
+.tocNo { font-size: 0.72rem; color: var(--accent); }
+.tocTitle { font-family: var(--font-classic); line-height: 1.45; }
+.tocRoutine button { color: var(--muted); }
+.tocRoutine .tocNo { color: var(--muted); }
+
+@media (min-width: 1000px) {
+  .reader.wide { max-width: 1120px; }
+  .readerBody.hasToc { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .readerBody.hasToc .readerToc {
+    position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; margin: 0;
+  }
+}
+
+.readerContent.structured {
+  background: transparent; border: none; box-shadow: none; padding: 0;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.entry {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+  scroll-margin-top: 1rem;
+}
+.entryHead { display: flex; flex-direction: column; gap: 0.2rem; }
+.entryNo { font-size: 0.78rem; font-weight: 700; color: var(--accent); }
+.readerContent .entryTitle {
+  margin: 0; padding: 0; border: none; font-family: var(--font-classic);
+  font-size: 1.25rem; line-height: 1.5; outline: none;
+}
+.entryTitle.untitled { color: var(--muted); font-family: var(--font-sans); font-size: 1rem; }
+.entryLabel { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem 1.4rem; }
+.pair .han { background: var(--bg); border-radius: 10px; padding: 0.9rem 1rem; }
+.pair .han .wonmun { margin: 0; padding: 0; background: none; border: none; border-radius: 0; font-size: 1.15rem; }
+.pair .ko p { font-size: 1.04rem; line-height: 1.85; margin: 0 0 0.6rem; }
+.pair .ko p:last-child { margin-bottom: 0; }
+.reading { border-top: 1px solid var(--border); padding-top: 0.8rem; color: var(--muted); }
+.reading p { margin: 0; }
+.gloss summary, .entryIntro summary { cursor: pointer; font-size: 0.88rem; font-weight: 500; color: var(--muted); }
+.gloss[open] summary { margin-bottom: 0.4rem; }
+.extra { font-size: 0.92rem; }
+.extra ul { margin-bottom: 0; }
+.entry details.articleMeta { margin: 0; }
+
+.entry.routine { padding: 0.8rem 1.2rem; box-shadow: none; gap: 0.5rem; }
+.entry.routine summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; min-height: 28px; color: var(--muted); }
+.routineTag { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
+.entryTitleInline { font-family: var(--font-classic); }
+.entry.routine .han { margin-top: 0.4rem; }
+.entry.routine .wonmun { margin: 0; }
+
+.entryIntro {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.7rem 1.1rem;
+}
+.entryIntro[open] summary { margin-bottom: 0.5rem; }
+
+/* 보기 방식 */
+.view-ko .pair .han, .view-ko .entry.routine .han { display: none; }
+.view-han .pair .ko, .view-han .reading, .view-han .gloss { display: none; }
+.view-ko .pair, .view-han .pair { grid-template-columns: 1fr; }
+
+@media (max-width: 600px) {
+  .entry { padding: 1.1rem 1rem; }
+  .segmented { margin-left: 0; }
+  .yearBtn { flex-basis: 3rem; }
+  .bDays { flex-basis: 100%; }
+}
+
 /* Let .controls stick against the page, not this wrapper. */
 #listChrome { display: contents; }
 .controls.stuck .searchHint { display: none; }

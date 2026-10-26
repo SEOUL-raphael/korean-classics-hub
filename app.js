@@ -26,13 +26,23 @@
     reading: false,
     listScroll: 0,
     renderToken: 0,
+    reignIndex: {}, // sourceId -> eras (왕 → 해 → 달 → 날)
+    browse: { king: null, year: null, month: null, daySort: "date" },
+    view: "both", // reader: both | ko | han
   };
+  try { state.view = localStorage.getItem("kch.view") || "both"; } catch (e) { /* storage blocked */ }
 
   var collator = new Intl.Collator("ko", { numeric: true, sensitivity: "base" });
 
   function $(id) { return document.getElementById(id); }
   var gridView = $("gridView");
   var grid = $("grid");
+  var browser = $("browser");
+  var sortLabel = $("sortLabel");
+  var readerTools = $("readerTools");
+  var readerToc = $("readerToc");
+  var readerBody = $("readerBody");
+  var readerCrumbs = $("readerCrumbs");
   var notice = $("notice");
   var emptyState = $("emptyState");
   var resultCount = $("resultCount");
@@ -263,13 +273,49 @@
     return m ? parseInt(m[1], 10) : null;
   }
 
+  // reign sources (승정원일기): the key encodes 왕대·재위년·월·윤달·일, e.g.
+  // SJW-G21030020 = 정조 21년 3월 2일. sources.json maps each prefix to a
+  // king and the year before 원년, so 서기 = base + 재위년 (0 = 즉위년).
+  function reignEras(source) {
+    if (!source._eras) {
+      source._eras = {};
+      (source.reign.eras || []).forEach(function (e, i) { e.order = i; source._eras[e.prefix] = e; });
+    }
+    return source._eras;
+  }
+
+  function parseReign(source, key) {
+    var m = String(key).match(new RegExp(source.reign.key_pattern));
+    if (!m) return null;
+    var era = reignEras(source)[m[1]];
+    if (!era) return null;
+    var year = parseInt(m[2], 10);
+    return {
+      prefix: m[1], king: era.king, era: era, year: year,
+      month: parseInt(m[3], 10), leap: m[4] === "1", day: parseInt(m[5], 10),
+      ad: era.base + year,
+    };
+  }
+
+  function reignYearLabel(year) { return year === 0 ? "즉위년" : year + "년"; }
+  function monthLabel(month, leap) { return (leap ? "윤" : "") + month + "월"; }
+  function monthKey(month, leap) { return (leap ? "윤" : "") + month; }
+  function fixAccession(s) { return String(s || "").replace(/(\S) 0년/g, "$1 즉위년"); }
+
   function toItem(source, row) {
     var f = source.fields || {};
     var id = get(row, f.id);
+    var reign = source.reign ? parseReign(source, id) : null;
     var titleKo = clean(get(row, f.title_ko));
     var titleHanja = clean(get(row, f.title_hanja));
     var subtitle = clean(get(row, f.subtitle));
     var date = clean(get(row, f.date));
+    if (reign) {
+      // The index sometimes tags a king's last day with his successor; the key is right.
+      subtitle = reign.king;
+      titleKo = fixAccession(titleKo);
+      date = fixAccession(date);
+    }
     var dateRaw = clean(get(row, f.date_sort || f.date));
     var dateKey = source.date_sort_mode === "year" ? yearOf(dateRaw) : (dateRaw || null);
     var displayTitle = titleKo || titleHanja || String(id);
@@ -290,8 +336,46 @@
         ? String(get(row, f.title_sort) || "")
         : displayTitle.replace(/^(\s*[[(（【][^\])）】]*[\])）】]\s*)+/, "") || displayTitle,
       dateKey: dateKey,
-      haystack: normalize([titleKo, titleHanja, subtitle, date, id].join(" ")),
+      reign: reign,
+      haystack: normalize([titleKo, titleHanja, subtitle, date, id, reign ? reign.ad : ""].join(" ")),
     };
+  }
+
+  // 왕 → 해 → 달 → 날 tree for the reign browser.
+  function buildReignIndex(source) {
+    var eras = [];
+    var byPrefix = {};
+    state.items.forEach(function (it) {
+      if (it._source !== source.id || !it.reign) return;
+      var r = it.reign;
+      var e = byPrefix[r.prefix];
+      if (!e) {
+        e = byPrefix[r.prefix] = { prefix: r.prefix, king: r.king, order: r.era.order, base: r.era.base, years: {}, days: 0, entries: 0 };
+        eras.push(e);
+      }
+      var y = e.years[r.year] = e.years[r.year] || { year: r.year, months: {}, days: 0, entries: 0 };
+      var mk = monthKey(r.month, r.leap);
+      var m = y.months[mk] = y.months[mk] || { key: mk, month: r.month, leap: r.leap, items: [], entries: 0 };
+      m.items.push(it);
+      m.entries += it.count;
+      y.days++; y.entries += it.count;
+      e.days++; e.entries += it.count;
+    });
+    eras.sort(function (a, b) { return a.order - b.order; });
+    eras.forEach(function (e) {
+      e.yearList = Object.keys(e.years).map(Number).sort(function (a, b) { return a - b; }).map(function (k) {
+        var y = e.years[k];
+        y.monthList = Object.keys(y.months).map(function (mk) { return y.months[mk]; })
+          .sort(function (a, b) { return a.month - b.month || a.leap - b.leap; });
+        y.monthList.forEach(function (m) {
+          m.items.sort(function (a, b) { return collator.compare(a._id, b._id); });
+        });
+        return y;
+      });
+      e.firstYear = e.yearList[0].year;
+      e.lastYear = e.yearList[e.yearList.length - 1].year;
+    });
+    return eras;
   }
 
   function loadSource(source) {
@@ -483,8 +567,13 @@
     function add(t) {
       if (t && t !== item.displayTitle && chips.indexOf(t) === -1) chips.push(t);
     }
-    add(item.subtitle || (forReader ? "저자 미상" : ""));
-    add(item.date || (forReader ? "연대 미상" : ""));
+    if (item.reign) {
+      add(item.reign.king);
+      add("서기 " + item.reign.ad + (forReader ? "년 · 음력" : ""));
+    } else {
+      add(item.subtitle || (forReader ? "저자 미상" : ""));
+      add(item.date || (forReader ? "연대 미상" : ""));
+    }
     if (item.count > 0 && src.fields && src.fields.count) add("기사 " + fmt(item.count) + "건");
     return chips;
   }
@@ -568,7 +657,224 @@
     }
   }
 
+  // ------------------------------------------------ reign browser (승정원일기)
+  // With a reign source selected and no search text, the list becomes
+  // 왕 → 재위년 → 달 → 날 instead of thousands of flat date cards.
+
+  function browseSource() {
+    var s = state.sourcesById[state.sourceFilter];
+    return s && s.reign && !state.query && state.reignIndex[s.id] ? s : null;
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function browseSelect(patch) {
+    Object.keys(patch).forEach(function (k) { state.browse[k] = patch[k]; });
+    syncListUrl();
+    renderBrowser();
+  }
+
+  function eraSpanText(e) {
+    return (e.base + e.firstYear) + "–" + (e.base + e.lastYear) + " · " +
+      reignYearLabel(e.firstYear) + "~" + reignYearLabel(e.lastYear);
+  }
+
+  function renderBrowser() {
+    var source = browseSource();
+    var eras = state.reignIndex[source.id];
+    var b = state.browse;
+    var era = eras.filter(function (e) { return e.king === b.king; })[0] || eras[0];
+    var year = era.years[b.year] || era.yearList[0];
+    var month = year.months[b.month] || year.monthList[0];
+    b.king = era.king; b.year = year.year; b.month = month.key;
+
+    browser.innerHTML = "";
+
+    // 왕대
+    var kingSec = el("section", "bSection");
+    kingSec.setAttribute("aria-labelledby", "bKingH");
+    var kh = el("h2", "bHeading", "왕대"); kh.id = "bKingH";
+    kingSec.appendChild(kh);
+    var kingRow = el("div", "kingRow");
+    eras.forEach(function (e, i) {
+      var prev = eras[i - 1];
+      if (prev && e.base + e.firstYear - (prev.base + prev.lastYear) > 5) {
+        var gap = el("div", "kingGap");
+        gap.appendChild(el("strong", null, (prev.base + prev.lastYear + 1) + "–" + (e.base + e.firstYear - 1)));
+        gap.appendChild(el("span", null, "이 시기는 아직 자료가 없습니다"));
+        kingRow.appendChild(gap);
+      }
+      var btn = el("button", "kingBtn");
+      btn.type = "button";
+      btn.setAttribute("aria-pressed", String(e === era));
+      btn.appendChild(el("span", "kingName", e.king));
+      btn.appendChild(el("span", "kingSub", eraSpanText(e)));
+      btn.appendChild(el("span", "kingSub", fmt(e.days) + "일 · 기사 " + fmt(e.entries) + "건"));
+      btn.addEventListener("click", function () { browseSelect({ king: e.king, year: null, month: null }); });
+      kingRow.appendChild(btn);
+    });
+    kingSec.appendChild(kingRow);
+    browser.appendChild(kingSec);
+
+    // 재위 연도
+    var yearSec = el("section", "bSection");
+    yearSec.setAttribute("aria-labelledby", "bYearH");
+    var yhRow = el("div", "bHeadRow");
+    var yh = el("h2", "bHeading", era.king + " 재위 연도"); yh.id = "bYearH";
+    yhRow.appendChild(yh);
+    yhRow.appendChild(el("span", "bNote", "막대 높이 = 번역된 날짜 수"));
+    yearSec.appendChild(yhRow);
+    var chartWrap = el("div", "yearChartWrap");
+    var chart = el("div", "yearChart");
+    var maxDays = Math.max.apply(null, era.yearList.map(function (y) { return y.days; }));
+    era.yearList.forEach(function (y) {
+      var btn = el("button", "yearBtn");
+      btn.type = "button";
+      var on = y === year;
+      btn.setAttribute("aria-pressed", String(on));
+      btn.setAttribute("aria-label", era.king + " " + reignYearLabel(y.year) + ", 서기 " + (era.base + y.year) + "년, " + y.days + "일");
+      btn.appendChild(el("span", "yearDays", y.days + "일"));
+      var bar = el("span", "yearBar");
+      bar.style.height = Math.max(4, Math.round(y.days / maxDays * 96)) + "px";
+      btn.appendChild(bar);
+      btn.appendChild(el("span", "yearLabel", reignYearLabel(y.year)));
+      btn.appendChild(el("span", "yearAd", String(era.base + y.year)));
+      btn.addEventListener("click", function () { browseSelect({ year: y.year, month: null }); });
+      chart.appendChild(btn);
+    });
+    chartWrap.appendChild(chart);
+    yearSec.appendChild(chartWrap);
+    browser.appendChild(yearSec);
+    requestAnimationFrame(function () {
+      var sel = chart.querySelector('[aria-pressed="true"]');
+      if (sel && chartWrap.scrollWidth > chartWrap.clientWidth) {
+        chartWrap.scrollLeft = sel.offsetLeft - chartWrap.clientWidth / 2 + sel.offsetWidth / 2;
+      }
+    });
+
+    // 달 + 날
+    var cols = el("div", "bCols");
+    var monthSec = el("section", "bSection bMonths");
+    monthSec.setAttribute("aria-labelledby", "bMonthH");
+    var mhRow = el("div", "bHeadRow");
+    var mh = el("h2", "bHeading", era.king + " " + reignYearLabel(year.year) + " (" + (era.base + year.year) + ") · 달별");
+    mh.id = "bMonthH";
+    mhRow.appendChild(mh);
+    mhRow.appendChild(el("span", "bNote", year.monthList.length + "개월 · " + fmt(year.days) + "일 · 기사 " + fmt(year.entries) + "건"));
+    monthSec.appendChild(mhRow);
+    if (year.days / year.monthList.length < 8) {
+      monthSec.appendChild(el("p", "bHint", "이 자료는 달마다 1일·2일·그믐 같은 일부 날짜만 번역되어 있습니다. 목록에 없는 날은 자료가 없는 날입니다. 날짜는 음력입니다."));
+    }
+    var mgrid = el("div", "monthGrid");
+    year.monthList.forEach(function (m) {
+      var btn = el("button", "monthBtn");
+      btn.type = "button";
+      btn.setAttribute("aria-pressed", String(m === month));
+      var top = el("span", "monthTop");
+      top.appendChild(el("span", "monthName", monthLabel(m.month, m.leap)));
+      top.appendChild(el("span", "monthCount", "기사 " + m.entries));
+      btn.appendChild(top);
+      var pills = el("span", "monthDays");
+      m.items.forEach(function (it) {
+        pills.appendChild(el("span", "dayPill", (it.reign.day ? it.reign.day + "일" : "미상") + " " + it.count + "건"));
+      });
+      btn.appendChild(pills);
+      btn.addEventListener("click", function () {
+        browseSelect({ month: m.key });
+        var target = $("bDayH");
+        if (target && window.matchMedia("(max-width: 900px)").matches) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      mgrid.appendChild(btn);
+    });
+    monthSec.appendChild(mgrid);
+    cols.appendChild(monthSec);
+
+    var daySec = el("section", "bSection bDays");
+    daySec.setAttribute("aria-labelledby", "bDayH");
+    var dhRow = el("div", "bHeadRow");
+    var dh = el("h2", "bHeading", monthLabel(month.month, month.leap) + "의 날짜");
+    dh.id = "bDayH";
+    dhRow.appendChild(dh);
+    var sortGroup = el("div", "segmented");
+    sortGroup.setAttribute("role", "group");
+    sortGroup.setAttribute("aria-label", "날짜 정렬");
+    [["date", "날짜순"], ["count", "기사 많은 순"]].forEach(function (opt) {
+      var sb = el("button", null, opt[1]);
+      sb.type = "button";
+      sb.setAttribute("aria-pressed", String(b.daySort === opt[0]));
+      sb.addEventListener("click", function () { browseSelect({ daySort: opt[0] }); });
+      sortGroup.appendChild(sb);
+    });
+    dhRow.appendChild(sortGroup);
+    daySec.appendChild(dhRow);
+
+    var days = month.items.slice();
+    if (b.daySort === "count") days.sort(function (x, y) { return y.count - x.count || collator.compare(x._id, y._id); });
+    var lastDay = Math.max.apply(null, month.items.map(function (it) { return it.reign.day; }));
+    days.forEach(function (it) {
+      var card = el("a", "dayCard");
+      card.href = readerHash(it);
+      var top = el("span", "dayTop");
+      top.appendChild(el("span", "dayDate", monthLabel(month.month, month.leap) + " " + (it.reign.day ? it.reign.day + "일" : "날짜 미상")));
+      top.appendChild(el("span", "dayMeta", (it.reign.day >= 29 && it.reign.day === lastDay ? "그믐 · " : "") + "기사 " + it.count + "건"));
+      top.appendChild(el("span", "dayGo", "읽기 →"));
+      card.appendChild(top);
+      var head = el("span", "dayHeadline", "…");
+      head.lang = "ko";
+      card.appendChild(head);
+      var routine = el("span", "dayRoutine");
+      card.appendChild(routine);
+      daySec.appendChild(card);
+      loadDayHeadline(source, it, head, routine);
+    });
+    cols.appendChild(daySec);
+    browser.appendChild(cols);
+  }
+
+  function routineRe(source) {
+    var p = source.reign && source.reign.routine_pattern;
+    return p ? new RegExp(p) : null;
+  }
+
+  function isUntitled(heading) {
+    return /^[A-Z]+-[A-Z0-9^_-]{8,}$/.test(heading.trim());
+  }
+
+  // The index has no article titles, so read the day file (cached) and show
+  // its first non-routine heading.
+  function loadDayHeadline(source, item, headEl, routineEl) {
+    var re = routineRe(source);
+    fetchTextCached(source.base_url + "/" + item.path).then(function (text) {
+      var heads = (text.match(/^## .+$/gm) || []).map(function (h) { return h.slice(3).trim(); });
+      var routine = re ? heads.filter(function (h) { return re.test(h); }) : [];
+      var main = heads.filter(function (h) { return !(re && re.test(h)); });
+      var first = main[0];
+      if (!first) headEl.textContent = routine[0] || "기사 제목 없음";
+      else headEl.textContent = isUntitled(first) ? "제목 없는 기사" + (main.length > 1 ? " 외 " + (main.length - 1) + "건" : "") : first + (main.length > 1 ? " 외 " + (main.length - 1) + "건" : "");
+      routineEl.textContent = routine.length && first ? "반복 기록: " + routine[0] : "";
+    }, function () {
+      headEl.textContent = "제목을 불러오지 못했습니다";
+    });
+  }
+
   function renderGrid(reset) {
+    var bsrc = browseSource();
+    browser.hidden = !bsrc;
+    grid.hidden = !!bsrc;
+    sortLabel.hidden = !!bsrc;
+    if (bsrc) {
+      grid.removeAttribute("aria-busy");
+      emptyState.hidden = true;
+      state.filtered = [];
+      resultCount.textContent = fmt(itemCount(bsrc.id)) + (bsrc.item_unit || "건");
+      renderBrowser();
+      return;
+    }
     if (reset) {
       state.filtered = filteredSorted();
       state.shown = 0;
@@ -618,8 +924,15 @@
     var src = p.get("src");
     state.sourceFilter = src && state.sourcesById[src] && state.sourcesById[src].status === "active" ? src : "all";
     var sort = p.get("sort");
-    if (sort && sortSelect.querySelector('option[value="' + sort + '"]')) state.sort = sort;
+    state.sort = sort && sortSelect.querySelector('option[value="' + sort + '"]') ? sort : "title";
     sortSelect.value = state.sort;
+    var y = p.get("y");
+    state.browse = {
+      king: p.get("king"),
+      year: y === null || y === "" ? null : (y === "즉위년" ? 0 : parseInt(y, 10)),
+      month: p.get("m"),
+      daySort: p.get("dsort") === "count" ? "count" : "date",
+    };
   }
 
   function syncListUrl() {
@@ -627,8 +940,15 @@
     if (state.query) p.set("q", state.query);
     if (state.sourceFilter !== "all") p.set("src", state.sourceFilter);
     if (state.sort !== "title") p.set("sort", state.sort);
+    if (browseSource() && state.browse.king) {
+      p.set("king", state.browse.king);
+      if (state.browse.year != null) p.set("y", state.browse.year);
+      if (state.browse.month) p.set("m", state.browse.month);
+      if (state.browse.daySort === "count") p.set("dsort", "count");
+    }
     var qs = p.toString();
     history.replaceState(history.state, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+    lastListSearch = location.search;
   }
 
   var searchTimer = null;
@@ -673,7 +993,46 @@
     }
   }
 
+  function listHref(params) {
+    var p = new URLSearchParams();
+    Object.keys(params).forEach(function (k) { if (params[k] != null) p.set(k, params[k]); });
+    return location.pathname + "?" + p.toString();
+  }
+
+  function reignListParams(item, depth) {
+    var r = item.reign;
+    var p = { src: item._source };
+    if (depth >= 1) p.king = r.king;
+    if (depth >= 2) p.y = r.year;
+    if (depth >= 3) p.m = monthKey(r.month, r.leap);
+    return p;
+  }
+
+  function renderCrumbs(item) {
+    readerCrumbs.innerHTML = "";
+    if (!item.reign) { readerCrumbs.hidden = true; return; }
+    var r = item.reign;
+    var parts = [
+      [item._sourceName, 0],
+      [r.king, 1],
+      [reignYearLabel(r.year) + " (" + r.ad + ")", 2],
+      [monthLabel(r.month, r.leap), 3],
+    ];
+    parts.forEach(function (pt) {
+      var a = el("a", null, pt[0]);
+      a.href = listHref(reignListParams(item, pt[1]));
+      a.setAttribute("data-nav", "list");
+      readerCrumbs.appendChild(a);
+      readerCrumbs.appendChild(el("span", "crumbSep", "›")).setAttribute("aria-hidden", "true");
+    });
+    var cur = el("span", null, r.day ? r.day + "일" : "날짜 미상");
+    cur.setAttribute("aria-current", "page");
+    readerCrumbs.appendChild(cur);
+    readerCrumbs.hidden = false;
+  }
+
   function renderReaderHeader(item, subtitle) {
+    renderCrumbs(item);
     var chips = metaChips(item, true);
     readerHeader.innerHTML =
       '<span class="sourceBadge">' + escapeHtml(item._sourceName) + "</span>" +
@@ -718,11 +1077,178 @@
     readerPager.hidden = false;
   }
 
+  function resetReaderExtras() {
+    readerToc.hidden = true;
+    readerToc.innerHTML = "";
+    readerTools.hidden = true;
+    readerBody.classList.remove("hasToc");
+    readerView.classList.remove("wide");
+    readerContent.classList.remove("structured");
+  }
+
   function showContent(url, text, source, item, mdOpts) {
+    resetReaderExtras();
     readerContent.innerHTML = renderMarkdown(text, mdOpts);
     rewriteContentLinks(readerContent, source, item);
+    var toc = structureEntries(readerContent, source);
+    if (toc) {
+      readerTools.hidden = false;
+      applyView();
+      renderToc(toc, source);
+    }
     readerSource.innerHTML = '원본 파일: <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + "</a>";
   }
+
+  // Regroup the generated markdown (## 기사 → ### 한글 번역/독음/의미/원문 …)
+  // into one card per article with 원문 and 번역 side by side. Returns the
+  // table of contents, or null when the page has no such articles.
+  var KNOWN_SECTIONS = { "한글 번역": 1, "독음": 1, "의미": 1, "원문": 1 };
+
+  function structureEntries(container, source) {
+    var nodes = Array.prototype.slice.call(container.children);
+    var intro = [];
+    var groups = [];
+    var cur = null;
+    nodes.forEach(function (n) {
+      if (n.tagName === "H2") { cur = { h: n, parts: [] }; groups.push(cur); }
+      else if (n.tagName === "HR") { /* dividers are drawn by the cards */ }
+      else if (cur) cur.parts.push(n);
+      else intro.push(n);
+    });
+    var hasArticles = groups.some(function (g) {
+      return g.parts.some(function (p) { return p.tagName === "H3" && /^(원문|한글 번역)$/.test(p.textContent.trim()); });
+    });
+    if (!hasArticles) return null;
+
+    var re = routineRe(source);
+    container.innerHTML = "";
+    container.classList.add("structured");
+    if (intro.length && !source.reign) {
+      var info = el("details", "entryIntro");
+      info.appendChild(el("summary", null, "자료 정보"));
+      intro.forEach(function (n) { info.appendChild(n); });
+      container.appendChild(info);
+    }
+
+    var toc = [];
+    var no = 0;
+    groups.forEach(function (g, gi) {
+      var sec = {};
+      var order = [];
+      var tail = [];
+      var meta = null;
+      var name = null;
+      g.parts.forEach(function (p) {
+        if (p.tagName === "H3") { name = p.textContent.trim(); sec[name] = []; order.push(name); return; }
+        if (p.tagName === "DETAILS" && !name && !meta) { meta = p; return; }
+        if (p.tagName === "DETAILS") { tail.push(p); name = null; return; }
+        if (name) sec[name].push(p); else tail.push(p);
+      });
+      var rawTitle = g.h.textContent.trim();
+      var untitled = isUntitled(rawTitle);
+      var title = untitled ? "제목 없는 기사" : rawTitle;
+      var routine = !!(re && re.test(rawTitle));
+      var id = "entry-" + (gi + 1);
+      var entry;
+
+      function block(cls, label, list, lang) {
+        var d = el("div", cls);
+        if (lang) d.lang = lang;
+        var l = el("span", "entryLabel", label);
+        l.lang = "ko";
+        d.appendChild(l);
+        (list || []).forEach(function (n) { d.appendChild(n); });
+        return d;
+      }
+
+      if (routine) {
+        entry = el("details", "entry routine");
+        var sum = el("summary");
+        sum.appendChild(el("span", "routineTag", "반복 기록"));
+        sum.appendChild(el("span", "entryTitleInline", title));
+        entry.appendChild(sum);
+        (sec["한글 번역"] || []).forEach(function (n) { entry.appendChild(n); });
+        if (sec["원문"]) entry.appendChild(block("han", "원문", sec["원문"], "lzh"));
+      } else {
+        no++;
+        entry = el("section", "entry");
+        var head = el("header", "entryHead");
+        head.appendChild(el("span", "entryNo", "기사 " + no));
+        var h = el("h2", "entryTitle" + (untitled ? " untitled" : ""), title);
+        h.tabIndex = -1;
+        head.appendChild(h);
+        entry.appendChild(head);
+        var pair = el("div", "pair");
+        if (sec["원문"]) pair.appendChild(block("han", "원문", sec["원문"], "lzh"));
+        if (sec["한글 번역"]) pair.appendChild(block("ko", "한글 번역", sec["한글 번역"]));
+        entry.appendChild(pair);
+        if (sec["독음"]) entry.appendChild(block("reading", "독음", sec["독음"]));
+        if (sec["의미"]) {
+          var gloss = el("details", "gloss");
+          gloss.appendChild(el("summary", null, "풀이 보기"));
+          sec["의미"].forEach(function (n) { gloss.appendChild(n); });
+          entry.appendChild(gloss);
+        }
+        order.forEach(function (nm) {
+          if (KNOWN_SECTIONS[nm]) return;
+          entry.appendChild(block("extra", nm, sec[nm]));
+        });
+        tail.forEach(function (n) { entry.appendChild(n); });
+        if (meta) entry.appendChild(meta);
+      }
+      entry.id = id;
+      container.appendChild(entry);
+      toc.push({ id: id, title: title, routine: routine, no: routine ? null : no });
+    });
+    return toc;
+  }
+
+  function renderToc(toc, source) {
+    if (toc.length < 2) return;
+    var articles = toc.filter(function (t) { return !t.routine; }).length;
+    var sum = el("summary", null, (source.reign ? "이 날의 기사 " : "이 묶음의 기사 ") + articles + "건");
+    readerToc.appendChild(sum);
+    var list = el("ol", "tocList");
+    toc.forEach(function (t) {
+      var li = el("li", t.routine ? "tocRoutine" : null);
+      var b = el("button", null);
+      b.type = "button";
+      b.appendChild(el("span", "tocNo", t.routine ? "반복 기록" : "기사 " + t.no));
+      b.appendChild(el("span", "tocTitle", t.title));
+      b.addEventListener("click", function () {
+        var target = $(t.id);
+        if (!target) return;
+        if (target.tagName === "DETAILS") target.open = true;
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        var h = target.querySelector(".entryTitle");
+        if (h) h.focus({ preventScroll: true });
+        if (!window.matchMedia("(min-width: 1000px)").matches) readerToc.open = false;
+      });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    readerToc.appendChild(list);
+    readerToc.open = window.matchMedia("(min-width: 1000px)").matches;
+    readerToc.hidden = false;
+    readerBody.classList.add("hasToc");
+    if (window.matchMedia("(min-width: 1000px)").matches) readerView.classList.add("wide");
+  }
+
+  function applyView() {
+    readerContent.classList.remove("view-both", "view-ko", "view-han");
+    readerContent.classList.add("view-" + state.view);
+    Array.prototype.forEach.call(readerTools.querySelectorAll("[data-view]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === state.view));
+    });
+  }
+
+  readerTools.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-view]");
+    if (!b) return;
+    state.view = b.getAttribute("data-view");
+    try { localStorage.setItem("kch.view", state.view); } catch (err) { /* ignore */ }
+    applyView();
+  });
 
   function showLoadError(retry) {
     readerContent.innerHTML = '<p class="loading">내용을 불러오지 못했습니다. <button type="button" class="pagerBtn">다시 시도</button></p>';
@@ -861,12 +1387,21 @@
   }
 
   var lastRoutedHref = null;
+  var lastListSearch = null;
 
   function route() {
     if (!state.ready) return;
     // hashchange and popstate both fire for one navigation; handle it once.
     if (location.href === lastRoutedHref) return;
     lastRoutedHref = location.href;
+    // Back/forward or a breadcrumb changed the list state (?src=&king=…).
+    if (location.search !== lastListSearch) {
+      lastListSearch = location.search;
+      readListUrl();
+      renderSourceTabs();
+      renderGrid(true);
+      state.listScroll = 0;
+    }
     var params = parseHash();
     if (!params.src || !params.id) {
       if (!state.loadErrors.length) showNotice("");
@@ -883,6 +1418,8 @@
     var entering = !state.reading;
     if (!state.loadErrors.length) showNotice("");
     showReader();
+    resetReaderExtras();
+    state.currentItem = item;
     var token = ++state.renderToken;
     if (source.reader === "article") {
       renderArticleItem(source, item, token);
@@ -897,11 +1434,27 @@
   }
 
   function goToList() {
-    history.pushState(null, "", location.pathname + location.search);
+    var item = state.currentItem;
+    var target = location.pathname + location.search;
+    // Opened from a shared link with no list state: land on that day's month.
+    if (item && item.reign && !new URLSearchParams(location.search).get("src")) {
+      target = listHref(reignListParams(item, 3));
+    }
+    history.pushState(null, "", target);
     route();
   }
 
   backLink.addEventListener("click", goToList);
+
+  // Breadcrumb links change the list state in place instead of reloading.
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[data-nav="list"]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    history.pushState(null, "", a.getAttribute("href"));
+    route();
+    window.scrollTo(0, 0);
+  });
 
   document.addEventListener("keydown", function (e) {
     var t = e.target;
@@ -943,6 +1496,10 @@
         state.orderBySource[s.id] = state.items
           .filter(function (it) { return it._source === s.id; })
           .sort(byDate);
+        if (s.reign && s.status === "active") {
+          var idx = buildReignIndex(s);
+          if (idx.length) state.reignIndex[s.id] = idx;
+        }
       });
       state.ready = true;
       renderSourceTabs();
@@ -952,6 +1509,7 @@
           '<button type="button" onclick="location.reload()">다시 시도</button>');
       }
       renderGrid(true);
+      lastListSearch = location.search;
       route();
     })
     .catch(function () {
