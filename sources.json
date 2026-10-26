@@ -6,14 +6,19 @@
     "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
     "index_path": "_index/books.jsonl",
     "parts_index_path": "_index/parts.jsonl",
+    "stats_path": "_index/unified_stats.json",
+    "stats_key": "aks",
+    "item_unit": "권",
     "reader": "book",
     "status": "active",
+    "date_sort_mode": "year",
     "fields": {
       "id": "book_id",
       "title_ko": "title_ko",
       "title_hanja": "title_hanja",
       "subtitle": "author",
       "date": "year",
+      "date_sort": "year",
       "count": "published_article_count",
       "path": "path"
     }
@@ -24,14 +29,20 @@
     "description": "국사편찬위원회 승정원일기 한문 원문·한글 번역 (날짜별 묶음)",
     "base_url": "https://seoul-raphael.github.io/aks-yoksa-mimo-proposal",
     "index_path": "_index/sjw_days.jsonl",
+    "stats_path": "_index/unified_stats.json",
+    "stats_key": "sjw",
+    "item_unit": "일",
     "reader": "article",
     "status": "active",
+    "date_sort_mode": "text",
     "fields": {
       "id": "day_key",
       "title_ko": "title_ko",
       "title_hanja": "title_hanja",
+      "title_sort": "day_key",
       "subtitle": "king_name_ko",
       "date": "issue_date_label",
+      "date_sort": "day_key",
       "count": "entry_count",
       "path": "path"
     }
