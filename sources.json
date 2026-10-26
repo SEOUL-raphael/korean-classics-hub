@@ -9,6 +9,13 @@
     "stats_path": "_index/unified_stats.json",
     "stats_key": "aks",
     "item_unit": "권",
+    "list_layout": "table",
+    "home": {
+      "short": "고도서",
+      "title": "책별로 읽기",
+      "blurb": "의궤·등록·서간 지침서 등. 책 소개·해제·본문 묶음 순서로 읽습니다.",
+      "cta": "책 목록 보기"
+    },
     "reader": "book",
     "status": "active",
     "date_sort_mode": "year",
@@ -32,6 +39,11 @@
     "stats_path": "_index/unified_stats.json",
     "stats_key": "sjw",
     "item_unit": "일",
+    "home": {
+      "short": "승정원일기",
+      "title": "날짜로 읽기",
+      "cta": "왕대별로 보기"
+    },
     "reader": "article",
     "status": "active",
     "date_sort_mode": "text",

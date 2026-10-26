@@ -28,6 +28,11 @@
 </header>
 
 <div id="listChrome">
+  <section class="hero" aria-labelledby="heroTitle">
+    <p class="heroEyebrow">한국학중앙연구원 · 승정원일기 · 한국고전번역원</p>
+    <h2 id="heroTitle" class="heroTitle">한문 고전을 원문과 한글로<br />나란히 읽습니다</h2>
+    <p id="heroLead" class="heroLead">여러 기관의 한문 고전 원문과 AI 번역을 한곳에서 찾고 바로 읽을 수 있습니다.</p>
+  </section>
   <nav class="sourceTabs" id="sourceTabs" aria-label="출처 선택"></nav>
   <p class="stats" id="stats" aria-live="polite"></p>
 
@@ -48,12 +53,20 @@
     </label>
     <span id="resultCount" class="resultCount" aria-live="polite"></span>
     <p id="searchHint" class="searchHint">한자 제목도 검색됩니다. 본문 검색은 아직 지원하지 않습니다.</p>
+    <nav class="quickLinks" aria-label="바로 가기">
+      <span>바로 가기</span>
+      <a href="?src=sjw&amp;king=%EC%A0%95%EC%A1%B0&amp;y=21" data-nav="list">정조 21년</a>
+      <a href="?src=sjw&amp;king=%ED%9A%A8%EC%A2%85&amp;y=0" data-nav="list">효종 즉위년</a>
+      <a href="?q=%EA%B0%80%EB%A1%80%EB%8F%84%EA%B0%90" data-nav="list">가례도감</a>
+      <a href="#src=aks&amp;id=kh2_je_a_vsu_20050_000">동궁일록</a>
+    </nav>
   </section>
 </div>
 
 <main id="main" tabindex="-1">
   <div id="gridView">
     <div id="notice" class="notice" hidden></div>
+    <div id="home" class="homeView" hidden></div>
     <div id="browser" class="browser" hidden></div>
     <div id="grid" class="grid" aria-busy="true">
       <p class="loading">목록을 불러오는 중…</p>

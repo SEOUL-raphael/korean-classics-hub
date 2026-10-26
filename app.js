@@ -38,6 +38,8 @@
   var gridView = $("gridView");
   var grid = $("grid");
   var browser = $("browser");
+  var homeEl = $("home");
+  var heroLead = $("heroLead");
   var sortLabel = $("sortLabel");
   var readerTools = $("readerTools");
   var readerToc = $("readerToc");
@@ -447,7 +449,7 @@
       }
       sourceTabs.appendChild(btn);
     }
-    add("all", "전체", state.ready ? fmt(state.items.length) : "");
+    add("all", "처음", "");
     state.sources.forEach(function (s) {
       if (s.status === "active") {
         add(s.id, s.name, state.ready ? fmt(itemCount(s.id)) + (s.item_unit || "") : "");
@@ -470,6 +472,17 @@
       }
     });
     statsLine.textContent = parts.join("  ·  ");
+
+    var lead = [];
+    var articles = 0;
+    state.sources.forEach(function (s) {
+      if (s.status !== "active") return;
+      lead.push(((s.home && s.home.short) || s.name) + " " + fmt(itemCount(s.id)) + (s.item_unit || "건"));
+      var st = statsFor(s);
+      if (st && st.articles) articles += st.articles;
+    });
+    heroLead.textContent = lead.join(", ") + (articles ? " — 기사 " + fmt(articles) + "건" : "") +
+      "의 원문과 AI 번역을 한곳에서 찾고 바로 읽을 수 있습니다.";
   }
 
   sourceTabs.addEventListener("click", function (evt) {
@@ -862,7 +875,163 @@
     });
   }
 
+  // ------------------------------------------------------------- home page
+  // "처음" (no source, no search): hero search, one card per source and a
+  // short list of the books with the most articles.
+
+  function isHome() {
+    return state.sourceFilter === "all" && !state.query;
+  }
+
+  function renderHome() {
+    homeEl.innerHTML = "";
+
+    var srcSec = el("section", "homeSection");
+    srcSec.setAttribute("aria-labelledby", "homeSrcH");
+    var sh = el("h2", "homeHeading", "출처별로 둘러보기");
+    sh.id = "homeSrcH";
+    srcSec.appendChild(sh);
+    var cards = el("div", "srcCards");
+    state.sources.forEach(function (s) {
+      var home = s.home || {};
+      var st = statsFor(s);
+      if (s.status !== "active") {
+        var pending = el("div", "srcCard pending");
+        pending.appendChild(el("span", "srcEyebrow", s.description || s.name));
+        pending.appendChild(el("span", "srcTitle", s.name + " · 번역 준비 중"));
+        if (st && st.total_articles) {
+          pending.appendChild(el("span", "srcBlurb", fmt(st.ok) + " / " + fmt(st.total_articles) + "건 번역됨"));
+          var track = el("span", "progress");
+          track.setAttribute("role", "img");
+          var pct = Math.round((st.ok || 0) / st.total_articles * 100);
+          track.setAttribute("aria-label", "진행률 " + pct + "퍼센트");
+          var fill = el("span", "progressFill");
+          fill.style.width = pct + "%";
+          track.appendChild(fill);
+          pending.appendChild(track);
+        }
+        pending.appendChild(el("span", "srcBlurb", "번역이 끝나는 대로 이곳에서 찾아 읽을 수 있습니다."));
+        cards.appendChild(pending);
+        return;
+      }
+      var a = el("a", "srcCard");
+      a.href = "?src=" + encodeURIComponent(s.id);
+      a.setAttribute("data-nav", "list");
+      a.appendChild(el("span", "srcEyebrow", s.name));
+      a.appendChild(el("span", "srcTitle", home.title || s.name));
+      var nums = el("span", "srcNums");
+      function num(v, label) {
+        var n = el("span", "srcNum");
+        n.appendChild(el("span", "srcNumV", v));
+        n.appendChild(el("span", "srcNumL", label));
+        nums.appendChild(n);
+      }
+      num(fmt(itemCount(s.id)), s.item_unit || "건");
+      if (st && st.articles) num(fmt(st.articles), "기사");
+      a.appendChild(nums);
+      var eras = state.reignIndex[s.id];
+      if (eras) {
+        var bar = el("span", "eraBar");
+        bar.setAttribute("aria-hidden", "true");
+        eras.forEach(function (e) {
+          var seg = el("span", "eraSeg");
+          seg.style.flexGrow = e.days;
+          seg.title = e.king;
+          bar.appendChild(seg);
+        });
+        a.appendChild(bar);
+        a.appendChild(el("span", "srcBlurb", eras.map(function (e) { return e.king; }).join(" · ") + " — " + eras.length + "개 왕대"));
+      }
+      if (home.blurb) a.appendChild(el("span", "srcBlurb", home.blurb));
+      a.appendChild(el("span", "srcCta", (home.cta || "둘러보기") + " →"));
+      cards.appendChild(a);
+    });
+    srcSec.appendChild(cards);
+    homeEl.appendChild(srcSec);
+
+    // Featured list for each table-layout source
+    state.sources.forEach(function (s) {
+      if (s.status !== "active" || s.list_layout !== "table") return;
+      var items = state.items.filter(function (it) { return it._source === s.id; })
+        .sort(function (x, y) { return y.count - x.count || byTitle(x, y); })
+        .slice(0, 8);
+      if (!items.length) return;
+      var sec = el("section", "homeSection");
+      sec.setAttribute("aria-labelledby", "homeTop-" + s.id);
+      var row = el("div", "bHeadRow");
+      var h = el("h2", "homeHeading", ((s.home && s.home.short) || s.name) + " · 기사가 많은 책");
+      h.id = "homeTop-" + s.id;
+      row.appendChild(h);
+      row.appendChild(el("span", "bNote", fmt(itemCount(s.id)) + (s.item_unit || "건") + " 중 " + items.length + (s.item_unit || "건")));
+      sec.appendChild(row);
+      var table = el("div", "grid asTable");
+      table.appendChild(tableHead());
+      items.forEach(function (it) { table.appendChild(rowFor(it)); });
+      sec.appendChild(table);
+      var more = el("a", "moreLink", ((s.home && s.home.short) || s.name) + " " + fmt(itemCount(s.id)) + (s.item_unit || "건") + " 모두 보기 →");
+      more.href = "?src=" + encodeURIComponent(s.id);
+      more.setAttribute("data-nav", "list");
+      sec.appendChild(more);
+      homeEl.appendChild(sec);
+    });
+  }
+
+  function tableHead() {
+    var h = el("div", "bookHead");
+    h.setAttribute("aria-hidden", "true");
+    ["제목", "저자·편자", "연도", "기사"].forEach(function (t) { h.appendChild(el("span", null, t)); });
+    return h;
+  }
+
+  function rowFor(item) {
+    var a = el("a", "bookRow");
+    a.href = readerHash(item);
+    var t = el("span", "rTitle");
+    var ko = el("span", "rKo");
+    appendHighlighted(ko, item.displayTitle);
+    t.appendChild(ko);
+    if (item.title_hanja && item.title_hanja !== item.displayTitle) {
+      var hj = el("span", "rHanja");
+      hj.lang = "lzh";
+      appendHighlighted(hj, item.title_hanja);
+      t.appendChild(hj);
+    }
+    a.appendChild(t);
+    var au = el("span", "rAuthor");
+    appendHighlighted(au, item.subtitle || "미상");
+    a.appendChild(au);
+    var yr = el("span", "rYear");
+    if (typeof item.dateKey === "number") {
+      yr.appendChild(el("strong", null, String(item.dateKey)));
+      var raw = item.date !== String(item.dateKey) ? item.date : "";
+      if (raw) {
+        var rs = el("span", "rEra");
+        rs.lang = "lzh";
+        appendHighlighted(rs, raw);
+        yr.appendChild(rs);
+      }
+    } else {
+      yr.appendChild(el("span", "rEra", item.date && !/미상|未詳/.test(item.date) ? item.date : "연대 미상"));
+    }
+    a.appendChild(yr);
+    a.appendChild(el("span", "rCount", item.count ? "기사 " + fmt(item.count) : ""));
+    return a;
+  }
+
   function renderGrid(reset) {
+    var home = isHome();
+    document.body.classList.toggle("home", home);
+    homeEl.hidden = !home;
+    if (home) {
+      browser.hidden = true;
+      grid.hidden = true;
+      emptyState.hidden = true;
+      grid.removeAttribute("aria-busy");
+      state.filtered = [];
+      resultCount.textContent = "";
+      renderHome();
+      return;
+    }
     var bsrc = browseSource();
     browser.hidden = !bsrc;
     grid.hidden = !!bsrc;
@@ -875,15 +1044,19 @@
       renderBrowser();
       return;
     }
+    var curSrc = state.sourcesById[state.sourceFilter];
+    var asTable = !!(curSrc && curSrc.list_layout === "table");
+    grid.classList.toggle("asTable", asTable);
     if (reset) {
       state.filtered = filteredSorted();
       state.shown = 0;
       grid.innerHTML = "";
+      if (asTable && state.filtered.length) grid.appendChild(tableHead());
     }
     var items = state.filtered;
     var next = items.slice(state.shown, state.shown + PAGE_SIZE);
     var frag = document.createDocumentFragment();
-    next.forEach(function (item) { frag.appendChild(cardFor(item)); });
+    next.forEach(function (item) { frag.appendChild(asTable ? rowFor(item) : cardFor(item)); });
     grid.appendChild(frag);
     state.shown += next.length;
     grid.removeAttribute("aria-busy");
