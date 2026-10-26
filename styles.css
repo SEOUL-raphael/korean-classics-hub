@@ -409,6 +409,10 @@ details.articleMeta[open] summary { margin-bottom: 0.4rem; }
 .readerSource { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
 .readerSource a { color: var(--muted); }
 
+/* Let .controls stick against the page, not this wrapper. */
+#listChrome { display: contents; }
+.controls.stuck .searchHint { display: none; }
+
 /* In reader mode the list chrome is hidden. */
 body.reading #listChrome { display: none; }
 

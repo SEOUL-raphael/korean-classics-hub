@@ -868,7 +868,11 @@
     if (location.href === lastRoutedHref) return;
     lastRoutedHref = location.href;
     var params = parseHash();
-    if (!params.src || !params.id) { showGrid(); return; }
+    if (!params.src || !params.id) {
+      if (!state.loadErrors.length) showNotice("");
+      showGrid();
+      return;
+    }
     var source = state.sourcesById[params.src];
     var item = state.itemsByKey[params.src + ":" + params.id];
     if (!source || !item) {
@@ -877,6 +881,7 @@
       return;
     }
     var entering = !state.reading;
+    if (!state.loadErrors.length) showNotice("");
     showReader();
     var token = ++state.renderToken;
     if (source.reader === "article") {
