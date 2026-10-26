@@ -708,3 +708,81 @@ body.reading #listChrome { display: none; }
 body.home .brand p { display: none; }
 .heroTitle, .heroLead, .srcTitle { word-break: keep-all; }
 @media (max-width: 700px) { .heroTitle br { display: none; } }
+
+/* ==== Flat layer: fewer boxes, borders and shadows ====================== */
+:root { --shadow: none; }
+@media (prefers-color-scheme: dark) { :root { --shadow: none; } }
+
+/* List chrome: tab counts already carry the numbers; the hint only on 처음 */
+.stats { display: none; }
+body:not(.home) .searchHint { display: none; }
+
+/* Cards and rows don't lift */
+.card:hover, .card:focus-visible, a.srcCard:hover { transform: none; }
+
+/* Home source cards: whole card clickable via the title link */
+.srcCard.linked { position: relative; }
+.srcCard.linked:hover, .srcCard.linked:focus-within { border-color: var(--accent); }
+.srcLink { color: var(--text); text-decoration: none; }
+.srcLink::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.srcLink:focus-visible { outline: none; }
+.srcCard.linked:has(.srcLink:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.srcKings { display: flex; flex-wrap: wrap; gap: 0.4rem; position: relative; z-index: 1; }
+.srcKing {
+  padding: 0.35rem 0.8rem; min-height: 32px; display: inline-flex; align-items: center;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--bg);
+  color: var(--text); text-decoration: none; font-size: 0.88rem;
+}
+.srcKing:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Reign browser */
+.yearChartWrap { background: transparent; border: none; border-radius: 0; padding: 0 0 0.25rem; border-bottom: 1px solid var(--border); }
+.monthTile {
+  display: flex; flex-direction: column; gap: 0.5rem; padding: 0.7rem 0.75rem;
+  border-radius: 12px; background: var(--surface); border: 1.5px solid transparent;
+}
+.monthTile.selected { border-color: var(--accent); }
+.monthTop {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  min-height: 32px; padding: 0; border: none; background: none; font: inherit; color: var(--text);
+  cursor: pointer; text-align: left;
+}
+.monthTop:hover .monthName { color: var(--accent); }
+a.dayPill {
+  text-decoration: none; color: var(--text); font-size: 0.78rem;
+  padding: 0.25rem 0.6rem; min-height: 28px; display: inline-flex; align-items: center;
+}
+a.dayPill:hover { border-color: var(--accent); color: var(--accent); }
+.dayCard {
+  background: transparent; border: none; border-radius: 0;
+  border-bottom: 1px solid var(--border); padding: 0.9rem 0.2rem;
+}
+.dayCard:hover .dayDate, .dayCard:focus-visible .dayDate { color: var(--accent); }
+.bDays .bHeadRow { padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+
+/* Reader: plain header, entries separated by lines instead of cards */
+.readerHeader {
+  background: transparent; border: none; border-radius: 0; padding: 0 0 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.readerHeader .readerTitle { font-family: var(--font-classic); font-size: 1.7rem; }
+.readerContent {
+  background: transparent; border: none; border-radius: 0; padding: 0;
+}
+.readerContent.structured { gap: 0; }
+.entry {
+  background: transparent; border: none; border-radius: 0; padding: 1.6rem 0;
+  border-top: 1px solid var(--border);
+}
+.readerContent.structured > .entry:first-child,
+.readerContent.structured > .entryIntro + .entry { border-top: none; padding-top: 0.6rem; }
+.entry.routine { padding: 0.8rem 0; }
+.entryIntro { background: transparent; border: none; border-radius: 0; padding: 0 0 0.6rem; }
+.readerToc { background: transparent; border: none; border-radius: 0; padding: 0; }
+@media (min-width: 1000px) {
+  .readerBody.hasToc .readerToc { padding-right: 1rem; border-right: 1px solid var(--border); }
+}
+@media (max-width: 999px) {
+  .readerToc { border-bottom: 1px solid var(--border); padding-bottom: 0.6rem; }
+}
+.readerTools { padding-top: 0.2rem; }

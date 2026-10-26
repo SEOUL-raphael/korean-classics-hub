@@ -784,25 +784,31 @@
       monthSec.appendChild(el("p", "bHint", "이 자료는 달마다 1일·2일·그믐 같은 일부 날짜만 번역되어 있습니다. 목록에 없는 날은 자료가 없는 날입니다. 날짜는 음력입니다."));
     }
     var mgrid = el("div", "monthGrid");
+    // Each month: its name previews the month's headlines on the right; each
+    // date opens the reader directly (one click instead of two).
     year.monthList.forEach(function (m) {
-      var btn = el("button", "monthBtn");
+      var tile = el("div", "monthTile" + (m === month ? " selected" : ""));
+      var btn = el("button", "monthTop");
       btn.type = "button";
       btn.setAttribute("aria-pressed", String(m === month));
-      var top = el("span", "monthTop");
-      top.appendChild(el("span", "monthName", monthLabel(m.month, m.leap)));
-      top.appendChild(el("span", "monthCount", "기사 " + m.entries));
-      btn.appendChild(top);
-      var pills = el("span", "monthDays");
-      m.items.forEach(function (it) {
-        pills.appendChild(el("span", "dayPill", (it.reign.day ? it.reign.day + "일" : "미상") + " " + it.count + "건"));
-      });
-      btn.appendChild(pills);
+      btn.setAttribute("aria-label", monthLabel(m.month, m.leap) + " 기사 제목 미리보기, 기사 " + m.entries + "건");
+      btn.appendChild(el("span", "monthName", monthLabel(m.month, m.leap)));
+      btn.appendChild(el("span", "monthCount", "기사 " + m.entries));
       btn.addEventListener("click", function () {
         browseSelect({ month: m.key });
         var target = $("bDayH");
         if (target && window.matchMedia("(max-width: 900px)").matches) target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
-      mgrid.appendChild(btn);
+      tile.appendChild(btn);
+      var pills = el("span", "monthDays");
+      m.items.forEach(function (it) {
+        var a = el("a", "dayPill", (it.reign.day ? it.reign.day + "일" : "미상") + " " + it.count + "건");
+        a.href = readerHash(it);
+        a.setAttribute("aria-label", it.displayTitle + " 읽기, 기사 " + it.count + "건");
+        pills.appendChild(a);
+      });
+      tile.appendChild(pills);
+      mgrid.appendChild(tile);
     });
     monthSec.appendChild(mgrid);
     cols.appendChild(monthSec);
@@ -914,11 +920,14 @@
         cards.appendChild(pending);
         return;
       }
-      var a = el("a", "srcCard");
-      a.href = "?src=" + encodeURIComponent(s.id);
-      a.setAttribute("data-nav", "list");
+      // The whole card is clickable through the title link (stretched with
+      // ::after); 왕대 links sit above it so they can go one level deeper.
+      var a = el("div", "srcCard linked");
       a.appendChild(el("span", "srcEyebrow", s.name));
-      a.appendChild(el("span", "srcTitle", home.title || s.name));
+      var titleLink = el("a", "srcTitle srcLink", home.title || s.name);
+      titleLink.href = "?src=" + encodeURIComponent(s.id);
+      titleLink.setAttribute("data-nav", "list");
+      a.appendChild(titleLink);
       var nums = el("span", "srcNums");
       function num(v, label) {
         var n = el("span", "srcNum");
@@ -940,7 +949,14 @@
           bar.appendChild(seg);
         });
         a.appendChild(bar);
-        a.appendChild(el("span", "srcBlurb", eras.map(function (e) { return e.king; }).join(" · ") + " — " + eras.length + "개 왕대"));
+        var kings = el("span", "srcKings");
+        eras.forEach(function (e) {
+          var k = el("a", "srcKing", e.king);
+          k.href = "?src=" + encodeURIComponent(s.id) + "&king=" + encodeURIComponent(e.king);
+          k.setAttribute("data-nav", "list");
+          kings.appendChild(k);
+        });
+        a.appendChild(kings);
       }
       if (home.blurb) a.appendChild(el("span", "srcBlurb", home.blurb));
       a.appendChild(el("span", "srcCta", (home.cta || "둘러보기") + " →"));
