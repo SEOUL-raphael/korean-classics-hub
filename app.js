@@ -270,9 +270,41 @@
   //   fields.title_sort / fields.date_sort  optional sort keys
   //   date_sort_mode   "year" (pull a 4-digit year out) or "text" (as-is)
 
+  // 왕대·연호 → 서기: base = 원년의 전해, so 서기 = base + n. Used when a date
+  // has only a reign year ("고종40년", "肅宗22", "光武元年").
+  var ERA_BASES = [
+    ["태조", "太祖", 1391], ["정종", "定宗", 1398], ["태종", "太宗", 1400], ["세종", "世宗", 1418],
+    ["문종", "文宗", 1450], ["단종", "端宗", 1452], ["세조", "世祖", 1455], ["예종", "睿宗", 1468],
+    ["성종", "成宗", 1469], ["연산군", "燕山君", 1494], ["중종", "中宗", 1505], ["인종", "仁宗", 1544],
+    ["명종", "明宗", 1545], ["선조", "宣祖", 1567], ["광해군", "光海君", 1608], ["광해", "光海", 1608],
+    ["인조", "仁祖", 1622], ["효종", "孝宗", 1649], ["현종", "顯宗", 1659], ["숙종", "肅宗", 1674],
+    ["경종", "景宗", 1720], ["영조", "英祖", 1724], ["정조", "正祖", 1776], ["순조", "純祖", 1800],
+    ["헌종", "憲宗", 1834], ["철종", "哲宗", 1849], ["고종", "高宗", 1863], ["순종", "純宗", 1906],
+    ["광무", "光武", 1896], ["융희", "隆熙", 1906], ["메이지", "明治", 1867], ["다이쇼", "大正", 1911],
+    ["쇼와", "昭和", 1925],
+  ];
+  var ERA_RE = new RegExp("(" + ERA_BASES.map(function (e) { return e[0] + "|" + e[1]; }).join("|") + ")\\s*(\\d{1,2}|元)");
+  var ERA_LOOKUP = {};
+  ERA_BASES.forEach(function (e) { ERA_LOOKUP[e[0]] = e[2]; ERA_LOOKUP[e[1]] = e[2]; });
+
   function yearOf(v) {
-    var m = String(v || "").match(/(1[0-9]{3}|20[0-9]{2})/);
-    return m ? parseInt(m[1], 10) : null;
+    var s = String(v || "");
+    var m = s.match(/(1[0-9]{3}|20[0-9]{2})/);
+    if (m) return parseInt(m[1], 10);
+    var e = s.match(ERA_RE);
+    if (e) return ERA_LOOKUP[e[1]] + (e[2] === "元" ? 1 : parseInt(e[2], 10));
+    return null;
+  }
+
+  // Display clean-up for book titles/authors/dates (the raw values stay in
+  // the search text).
+  var UNKNOWN_DATE_RE = /^\[?(寫年|刊年|年紀)?未詳\]?$|^미상$/;
+
+  function cleanBookTitle(s) {
+    s = String(s || "").replace(/\s*n\d+-\d+책\s*$/, "");
+    var m = s.match(/^(.*\S)\s+\[(.+)\]$/);
+    if (m && /[一-鿿]/.test(m[2])) s = m[1];
+    return s.replace(/\s*n\d+-\d+책\s*$/, "").trim();
   }
 
   // reign sources (승정원일기): the key encodes 왕대·재위년·월·윤달·일, e.g.
@@ -318,6 +350,13 @@
       titleKo = fixAccession(titleKo);
       date = fixAccession(date);
     }
+    var rawTitles = titleKo + " " + titleHanja;
+    if (source.reader === "book") {
+      titleKo = cleanBookTitle(titleKo);
+      titleHanja = cleanBookTitle(titleHanja);
+      if (/미상/.test(subtitle) && subtitle.length <= 8) subtitle = "미상";
+      if (UNKNOWN_DATE_RE.test(date)) date = "";
+    }
     var dateRaw = clean(get(row, f.date_sort || f.date));
     var dateKey = source.date_sort_mode === "year" ? yearOf(dateRaw) : (dateRaw || null);
     var displayTitle = titleKo || titleHanja || String(id);
@@ -339,7 +378,8 @@
         : displayTitle.replace(/^(\s*[[(（【][^\])）】]*[\])）】]\s*)+/, "") || displayTitle,
       dateKey: dateKey,
       reign: reign,
-      haystack: normalize([titleKo, titleHanja, subtitle, date, id, reign ? reign.ad : ""].join(" ")),
+      row: row,
+      haystack: normalize([titleKo, titleHanja, rawTitles, subtitle, date, id, reign ? reign.ad : "", typeof dateKey === "number" ? dateKey : ""].join(" ")),
     };
   }
 
@@ -1266,41 +1306,49 @@
     readerPager.hidden = false;
   }
 
-  function resetReaderExtras() {
-    readerToc.hidden = true;
-    readerToc.innerHTML = "";
-    readerTools.hidden = true;
-    readerBody.classList.remove("hasToc");
-    readerView.classList.remove("wide");
-    readerContent.classList.remove("structured");
-  }
-
-  function showContent(url, text, source, item, mdOpts) {
-    resetReaderExtras();
-    readerContent.innerHTML = renderMarkdown(text, mdOpts);
-    rewriteContentLinks(readerContent, source, item);
-    var toc = structureEntries(readerContent, source);
-    if (toc) {
-      readerTools.hidden = false;
-      applyView();
-      renderToc(toc, source);
-    }
-    readerSource.innerHTML = '원본 파일: <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + "</a>";
-  }
-
+  // ---- Entry structuring ---------------------------------------------------
   // Regroup the generated markdown (## 기사 → ### 한글 번역/독음/의미/원문 …)
-  // into one card per article with 원문 and 번역 side by side. Returns the
-  // table of contents, or null when the page has no such articles.
+  // into one block per article with 원문 and 번역 side by side. Works on a
+  // freshly rendered container and can be called again for later 묶음, so a
+  // book reads as one continuous page. `ctx` carries numbering across calls.
   var KNOWN_SECTIONS = { "한글 번역": 1, "독음": 1, "의미": 1, "원문": 1 };
 
-  function structureEntries(container, source) {
+  function newEntryCtx(source, item) {
+    var vols = item && item.row && Number(item.row.volume_count) > 1;
+    return { source: source, seq: 0, no: 0, lastVol: null, multiVol: !!vols, toc: [] };
+  }
+
+  function volLabel(v) {
+    var m = String(v).match(/v(\d+)\]?\s*$/);
+    return m ? "제" + parseInt(m[1], 10) + "책" : String(v);
+  }
+
+  function metaMap(details) {
+    var map = {};
+    if (!details) return map;
+    Array.prototype.forEach.call(details.querySelectorAll(".metaList li"), function (li) {
+      var k = li.querySelector(".metaKey"), v = li.querySelector(".metaVal");
+      if (k && v) map[k.textContent.trim()] = v;
+    });
+    return map;
+  }
+
+  function snippetOf(nodes) {
+    var t = (nodes || []).map(function (n) { return n.textContent; }).join(" ").replace(/\s+/g, " ").trim();
+    return t.length > 46 ? t.slice(0, 46) + "…" : t;
+  }
+
+  // Returns { intro: [nodes before the first article], entries: [nodes], toc: [...] }
+  // or null when the page has no articles.
+  function structureEntries(container, ctx) {
+    var source = ctx.source;
     var nodes = Array.prototype.slice.call(container.children);
     var intro = [];
     var groups = [];
     var cur = null;
     nodes.forEach(function (n) {
       if (n.tagName === "H2") { cur = { h: n, parts: [] }; groups.push(cur); }
-      else if (n.tagName === "HR") { /* dividers are drawn by the cards */ }
+      else if (n.tagName === "HR") { /* entries draw their own dividers */ }
       else if (cur) cur.parts.push(n);
       else intro.push(n);
     });
@@ -1310,18 +1358,20 @@
     if (!hasArticles) return null;
 
     var re = routineRe(source);
-    container.innerHTML = "";
-    container.classList.add("structured");
-    if (intro.length && !source.reign) {
-      var info = el("details", "entryIntro");
-      info.appendChild(el("summary", null, "자료 정보"));
-      intro.forEach(function (n) { info.appendChild(n); });
-      container.appendChild(info);
+    var out = [];
+    var toc = [];
+
+    function block(cls, label, list, lang) {
+      var d = el("div", cls);
+      if (lang) d.lang = lang;
+      var l = el("span", "entryLabel", label);
+      l.lang = "ko";
+      d.appendChild(l);
+      (list || []).forEach(function (n) { d.appendChild(n); });
+      return d;
     }
 
-    var toc = [];
-    var no = 0;
-    groups.forEach(function (g, gi) {
+    groups.forEach(function (g) {
       var sec = {};
       var order = [];
       var tail = [];
@@ -1333,23 +1383,25 @@
         if (p.tagName === "DETAILS") { tail.push(p); name = null; return; }
         if (name) sec[name].push(p); else tail.push(p);
       });
+      var info = metaMap(meta);
       var rawTitle = g.h.textContent.trim();
       var untitled = isUntitled(rawTitle);
       var title = untitled ? "제목 없는 기사" : rawTitle;
       var routine = !!(re && re.test(rawTitle));
-      var id = "entry-" + (gi + 1);
-      var entry;
+      var id = "entry-" + (++ctx.seq);
 
-      function block(cls, label, list, lang) {
-        var d = el("div", cls);
-        if (lang) d.lang = lang;
-        var l = el("span", "entryLabel", label);
-        l.lang = "ko";
-        d.appendChild(l);
-        (list || []).forEach(function (n) { d.appendChild(n); });
-        return d;
+      if (ctx.multiVol && info["권책"]) {
+        var vol = info["권책"].textContent.trim();
+        if (vol !== ctx.lastVol) {
+          ctx.lastVol = vol;
+          var vh = el("h2", "volHead", volLabel(vol));
+          vh.id = "vol-" + ctx.seq;
+          out.push(vh);
+          toc.push({ vol: true, id: vh.id, title: volLabel(vol) });
+        }
       }
 
+      var entry;
       if (routine) {
         entry = el("details", "entry routine");
         var sum = el("summary");
@@ -1359,10 +1411,12 @@
         (sec["한글 번역"] || []).forEach(function (n) { entry.appendChild(n); });
         if (sec["원문"]) entry.appendChild(block("han", "원문", sec["원문"], "lzh"));
       } else {
-        no++;
+        ctx.no++;
         entry = el("section", "entry");
         var head = el("header", "entryHead");
-        head.appendChild(el("span", "entryNo", "기사 " + no));
+        var no = el("span", "entryNo", "기사 " + ctx.no);
+        if (info["면/쪽"]) no.appendChild(el("span", "entryPage", " · " + info["면/쪽"].textContent.trim() + "면"));
+        head.appendChild(no);
         var h = el("h2", "entryTitle" + (untitled ? " untitled" : ""), title);
         h.tabIndex = -1;
         head.appendChild(h);
@@ -1382,28 +1436,99 @@
           if (KNOWN_SECTIONS[nm]) return;
           entry.appendChild(block("extra", nm, sec[nm]));
         });
-        tail.forEach(function (n) { entry.appendChild(n); });
-        if (meta) entry.appendChild(meta);
+        var foot = el("div", "entryFoot");
+        var srcA = info["출처"] && info["출처"].querySelector("a");
+        if (srcA) {
+          var link = el("a", "entrySrc", "원 출처에서 보기 ↗");
+          link.href = srcA.href;
+          link.target = "_blank";
+          link.rel = "noopener";
+          foot.appendChild(link);
+        }
+        tail.forEach(function (n) { foot.appendChild(n); });
+        if (meta) foot.appendChild(meta);
+        entry.appendChild(foot);
       }
       entry.id = id;
-      container.appendChild(entry);
-      toc.push({ id: id, title: title, routine: routine, no: routine ? null : no });
+      out.push(entry);
+      toc.push({ id: id, title: title, routine: routine, no: routine ? null : ctx.no, snippet: routine ? "" : snippetOf(sec["한글 번역"]) });
     });
-    return toc;
+    ctx.toc = ctx.toc.concat(toc);
+    return { intro: intro, entries: out, toc: toc };
   }
 
-  function renderToc(toc, source) {
-    if (toc.length < 2) return;
-    var articles = toc.filter(function (t) { return !t.routine; }).length;
-    var sum = el("summary", null, (source.reign ? "이 날의 기사 " : "이 묶음의 기사 ") + articles + "건");
-    readerToc.appendChild(sum);
+  function resetReaderExtras() {
+    readerToc.hidden = true;
+    readerToc.innerHTML = "";
+    readerTools.hidden = true;
+    readerBody.classList.remove("hasToc");
+    readerView.classList.remove("wide");
+    readerContent.classList.remove("structured");
+  }
+
+  function setSourceLine(links) {
+    readerSource.innerHTML = "";
+    if (!links.length) return;
+    readerSource.appendChild(document.createTextNode("원본 파일: "));
+    links.forEach(function (l, i) {
+      if (i) readerSource.appendChild(document.createTextNode(" · "));
+      var a = el("a", null, l[0]);
+      a.href = l[1];
+      a.target = "_blank";
+      a.rel = "noopener";
+      readerSource.appendChild(a);
+    });
+  }
+
+  function renderMdInto(text, source, item) {
+    var tmp = document.createElement("div");
+    tmp.innerHTML = renderMarkdown(text, { dropTitle: true });
+    rewriteContentLinks(tmp, source, item);
+    return tmp;
+  }
+
+  // Single-page sources (승정원일기 days).
+  function showContent(url, text, source, item) {
+    resetReaderExtras();
+    var tmp = renderMdInto(text, source, item);
+    var ctx = newEntryCtx(source, item);
+    var res = structureEntries(tmp, ctx);
+    readerContent.innerHTML = "";
+    if (res) {
+      readerContent.classList.add("structured");
+      res.entries.forEach(function (n) { readerContent.appendChild(n); });
+      readerTools.hidden = false;
+      applyView();
+      renderToc(ctx, source);
+    } else {
+      while (tmp.firstChild) readerContent.appendChild(tmp.firstChild);
+    }
+    setSourceLine([["이 날짜 파일", url]]);
+  }
+
+  function renderToc(ctx, source) {
+    readerToc.innerHTML = "";
+    var toc = ctx.toc;
+    var articles = toc.filter(function (t) { return !t.routine && !t.vol; }).length;
+    if (articles + toc.filter(function (t) { return t.routine; }).length < 2) {
+      readerToc.hidden = true;
+      readerBody.classList.remove("hasToc");
+      return;
+    }
+    var label = source.reign ? "이 날의 기사 " + articles + "건" : "기사 목록 " + articles + "건" + (ctx.more ? " (읽은 곳까지)" : "");
+    readerToc.appendChild(el("summary", null, label));
     var list = el("ol", "tocList");
     toc.forEach(function (t) {
-      var li = el("li", t.routine ? "tocRoutine" : null);
+      var li = el("li", t.vol ? "tocVol" : t.routine ? "tocRoutine" : null);
       var b = el("button", null);
       b.type = "button";
-      b.appendChild(el("span", "tocNo", t.routine ? "반복 기록" : "기사 " + t.no));
-      b.appendChild(el("span", "tocTitle", t.title));
+      if (t.vol) {
+        b.appendChild(el("span", "tocTitle", t.title));
+      } else {
+        b.appendChild(el("span", "tocNo", t.routine ? "반복 기록" : "기사 " + t.no));
+        b.appendChild(el("span", "tocTitle", t.title));
+        if (t.snippet) b.appendChild(el("span", "tocSnippet", t.snippet));
+      }
       b.addEventListener("click", function () {
         var target = $(t.id);
         if (!target) return;
@@ -1420,7 +1545,7 @@
     readerToc.open = window.matchMedia("(min-width: 1000px)").matches;
     readerToc.hidden = false;
     readerBody.classList.add("hasToc");
-    if (window.matchMedia("(min-width: 1000px)").matches) readerView.classList.add("wide");
+    readerView.classList.add("wide");
   }
 
   function applyView() {
@@ -1444,75 +1569,209 @@
     readerContent.querySelector("button").addEventListener("click", retry);
   }
 
-  // reader:"book" -- README / 해제 / 묶음 N
+  // ---- Books: one page --------------------------------------------------------
+  // Opening a book shows its body right away: 자료 정보 and 해제 sit folded on
+  // top, the chosen 묶음 (default 1) follows, and "다음 묶음 이어 읽기"
+  // appends the next one in place. #…&part=N starts at N; &view=haje opens
+  // the 해제.
+
+  // README "- 키: 값" lines before the first "##" -> 자료 정보
+  function bookInfoNode(readmeText, source, item) {
+    if (!readmeText) return null;
+    var head = readmeText.split(/\n## /)[0];
+    var lines = head.split("\n").filter(function (l) { return /^- /.test(l) && !/^- (순번|한자 제목):/.test(l); });
+    if (!lines.length) return null;
+    var d = el("details", "bookInfo");
+    d.appendChild(el("summary", null, "자료 정보"));
+    var tmp = renderMdInto(lines.join("\n"), source, item);
+    while (tmp.firstChild) d.appendChild(tmp.firstChild);
+    return d;
+  }
+
+  // 해제 is the archive's own (non-AI) commentary, split by 【정의】【서지사항】….
+  function hajeNode(text) {
+    if (!text) return null;
+    var body = text.replace(/\r\n/g, "\n")
+      .replace(/^# .*\n/, "")
+      .replace(/^- [^\n]*\n/gm, "")
+      .replace(/^G\d+\+[A-Z0-9_^-]+\s*$/gm, "")
+      .trim();
+    if (!body || /요약 해설만 작성/.test(body) && body.length < 80) return null;
+    var sections = [];
+    var curSec = { name: "", lines: [] };
+    body.split("\n").forEach(function (line) {
+      var parts = line.split(/(【[^】]+】)/);
+      parts.forEach(function (p) {
+        var m = p.match(/^【([^】]+)】$/);
+        if (m) { if (curSec.name || curSec.lines.length) sections.push(curSec); curSec = { name: m[1].trim(), lines: [] }; }
+        else if (p.trim()) curSec.lines.push(p.trim());
+      });
+    });
+    if (curSec.name || curSec.lines.length) sections.push(curSec);
+    if (!sections.length) return null;
+
+    var wrap = el("section", "haje");
+    wrap.id = "haje";
+    wrap.setAttribute("aria-labelledby", "hajeH");
+    var hh = el("h2", "hajeHead", "해제");
+    hh.id = "hajeH";
+    hh.tabIndex = -1;
+    wrap.appendChild(hh);
+    var lead = sections.filter(function (s) { return s.name === "정의"; })[0] || sections[0];
+    var leadP = el("p", "hajeLead", lead.lines.join(" "));
+    wrap.appendChild(leadP);
+    var rest = sections.filter(function (s) { return s !== lead; });
+    if (rest.length) {
+      var det = el("details", "hajeMore");
+      det.appendChild(el("summary", null, "해제 전체 보기 · " + rest.map(function (s) { return s.name || "본문"; }).join(" · ")));
+      rest.forEach(function (s) {
+        if (s.name) det.appendChild(el("h3", null, s.name));
+        s.lines.forEach(function (l) { det.appendChild(el("p", null, l)); });
+      });
+      wrap.appendChild(det);
+    }
+    wrap.appendChild(el("p", "hajeNote", "해제는 한국학중앙연구원이 작성한 원문 그대로입니다(AI 번역 아님)."));
+    return wrap;
+  }
+
   function renderBookItem(source, item, kind, partNo, token) {
     var parts = state.partsByBook[source.id + ":" + item._id] || [];
-    var hajeUrl = source.base_url + "/" + bookDir(item.path) + "/haje.md";
-    if (kind === "part" && !parts.some(function (p) { return p.part === partNo; })) kind = "readme";
+    var dir = source.base_url + "/" + bookDir(item.path);
+    var startIdx = 0;
+    if (kind === "part") {
+      var found = parts.map(function (p) { return p.part; }).indexOf(partNo);
+      if (found >= 0) startIdx = found;
+    }
 
-    renderReaderHeader(item, kind === "part" ? "묶음 " + partNo : kind === "haje" ? "해제" : "");
+    renderReaderHeader(item, startIdx > 0 ? "묶음 " + parts[startIdx].part : "");
     readerContent.innerHTML = '<p class="loading">불러오는 중…</p>';
     readerSource.innerHTML = "";
-    readerPager.hidden = true;
+    setPager(null, null);
     partTabs.innerHTML = "";
 
-    fetchTextCached(hajeUrl)
-      .then(function () { return true; }, function () { return false; })
-      .then(function (hasHaje) {
-        if (token !== state.renderToken) return;
-        if (kind === "haje" && !hasHaje) kind = "readme";
+    // 묶음 navigation only when there is more than one
+    if (parts.length > 1 && parts.length <= PART_TABS_MAX) {
+      parts.forEach(function (p, i) {
+        partTabs.appendChild(tabLink("묶음 " + p.part, readerHash(item, i ? { part: p.part } : {}), i === startIdx));
+      });
+    } else if (parts.length > PART_TABS_MAX) {
+      var sel = document.createElement("select");
+      sel.className = "partSelect active";
+      sel.setAttribute("aria-label", "본문 묶음으로 바로 가기 (전체 " + parts.length + "개)");
+      parts.forEach(function (p, i) {
+        var o = document.createElement("option");
+        o.value = p.part;
+        o.textContent = "묶음 " + p.part + " / " + parts.length + (p.article_count ? " · 기사 " + p.article_count + "건" : "");
+        if (i === startIdx) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function () {
+        location.hash = readerHash(item, sel.selectedIndex ? { part: sel.value } : {});
+      });
+      partTabs.appendChild(sel);
+    }
 
-        partTabs.innerHTML = "";
-        partTabs.appendChild(tabLink("책 소개", readerHash(item), kind === "readme"));
-        if (hasHaje) partTabs.appendChild(tabLink("해제", readerHash(item, { view: "haje" }), kind === "haje"));
-        if (parts.length && parts.length <= PART_TABS_MAX) {
-          parts.forEach(function (p) {
-            partTabs.appendChild(tabLink("묶음 " + p.part, readerHash(item, { part: p.part }), kind === "part" && partNo === p.part));
-          });
-        } else if (parts.length) {
-          var sel = document.createElement("select");
-          sel.className = "partSelect" + (kind === "part" ? " active" : "");
-          sel.setAttribute("aria-label", "본문 번역 묶음 선택 (전체 " + parts.length + "개)");
-          var ph = document.createElement("option");
-          ph.value = "";
-          ph.textContent = "본문 묶음 선택 (" + parts.length + "개)";
-          sel.appendChild(ph);
-          parts.forEach(function (p) {
-            var o = document.createElement("option");
-            o.value = p.part;
-            o.textContent = "묶음 " + p.part + (p.article_count ? " · 기사 " + p.article_count + "건" : "");
-            if (kind === "part" && p.part === partNo) o.selected = true;
-            sel.appendChild(o);
-          });
-          sel.addEventListener("change", function () {
-            if (sel.value) location.hash = readerHash(item, { part: sel.value });
-          });
-          partTabs.appendChild(sel);
+    var readmeUrl = source.base_url + "/" + item.path;
+    var hajeUrl = dir + "/haje.md";
+    function opt(p) { return p.then(function (t) { return t; }, function () { return ""; }); }
+
+    var load = function () {
+      readerContent.innerHTML = '<p class="loading">불러오는 중…</p>';
+      var partUrl = parts.length ? source.base_url + "/" + parts[startIdx].path : null;
+      Promise.all([
+        opt(fetchTextCached(readmeUrl)),
+        opt(fetchTextCached(hajeUrl)),
+        partUrl ? fetchTextCached(partUrl) : Promise.resolve(""),
+      ]).then(function (res) {
+        if (token !== state.renderToken) return;
+        resetReaderExtras();
+        readerContent.innerHTML = "";
+        var top = el("div", "bookTop");
+        var info = bookInfoNode(res[0], source, item);
+        if (info) top.appendChild(info);
+        var haje = hajeNode(res[1]);
+        if (haje) top.appendChild(haje);
+        if (top.childNodes.length) readerContent.appendChild(top);
+
+        var ctx = newEntryCtx(source, item);
+        // Number articles by their place in the whole book, even when starting at a later 묶음.
+        for (var pi = 0; pi < startIdx; pi++) ctx.no += Number(parts[pi].article_count) || 0;
+        var bodyWrap = el("div", "bookBody");
+        readerContent.appendChild(bodyWrap);
+        var links = [["책 소개", readmeUrl]];
+        if (haje) links.push(["해제", hajeUrl]);
+
+        function appendPart(idx, text) {
+          var r = structureEntries(renderMdInto(text, source, item), ctx);
+          if (r) r.entries.forEach(function (n) { bodyWrap.appendChild(n); });
+          links.push(["묶음 " + parts[idx].part, source.base_url + "/" + parts[idx].path]);
+          setSourceLine(links);
         }
 
-        // prev/next through 책 소개 → 해제 → 묶음 1..N
-        var seq = [{ label: "책 소개", href: readerHash(item) }];
-        if (hasHaje) seq.push({ label: "해제", href: readerHash(item, { view: "haje" }) });
-        parts.forEach(function (p) { seq.push({ label: "묶음 " + p.part, href: readerHash(item, { part: p.part }) }); });
-        var cur = kind === "readme" ? 0 : kind === "haje" ? 1 : seq.length - parts.length + parts.map(function (p) { return p.part; }).indexOf(partNo);
-        setPager(seq[cur - 1], seq[cur + 1]);
+        if (partUrl) {
+          appendPart(startIdx, res[2]);
+          readerContent.classList.add("structured");
+          readerTools.hidden = false;
+          applyView();
+        } else {
+          // No 묶음 index: fall back to the README itself.
+          var tmp = renderMdInto(res[0] || "", source, item);
+          while (tmp.firstChild) readerContent.appendChild(tmp.firstChild);
+          setSourceLine(links);
+        }
 
-        var url;
-        if (kind === "haje") url = hajeUrl;
-        else if (kind === "part") url = source.base_url + "/" + parts.filter(function (p) { return p.part === partNo; })[0].path;
-        else url = source.base_url + "/" + item.path;
-
-        var load = function () {
-          readerContent.innerHTML = '<p class="loading">불러오는 중…</p>';
-          fetchTextCached(url).then(function (text) {
-            if (token !== state.renderToken) return;
-            showContent(url, text, source, item, { dropTitle: true });
-          }, function () {
-            if (token === state.renderToken) showLoadError(load);
+        var moreBox = el("div", "moreBox");
+        readerContent.appendChild(moreBox);
+        var nextIdx = startIdx + 1;
+        function renderMore() {
+          moreBox.innerHTML = "";
+          if (!parts.length) return;
+          if (nextIdx >= parts.length) {
+            moreBox.appendChild(el("p", "moreEnd", parts.length > 1 ? "이 책의 마지막 묶음입니다." : "이 책의 공개 번역은 여기까지입니다."));
+            return;
+          }
+          var p = parts[nextIdx];
+          var btn = el("button", "moreBtn");
+          btn.type = "button";
+          btn.appendChild(el("span", null, "다음 묶음 이어 읽기"));
+          btn.appendChild(el("span", "moreSub", "묶음 " + p.part + " / " + parts.length + (p.article_count ? " · 기사 " + p.article_count + "건" : "")));
+          btn.addEventListener("click", function () {
+            btn.disabled = true;
+            btn.firstChild.textContent = "불러오는 중…";
+            fetchTextCached(source.base_url + "/" + p.path).then(function (text) {
+              if (token !== state.renderToken) return;
+              var firstNew = ctx.seq + 1;
+              appendPart(nextIdx, text);
+              nextIdx++;
+              ctx.more = true;
+              renderToc(ctx, source);
+              renderMore();
+              var target = $("entry-" + firstNew);
+              var h = target && target.querySelector(".entryTitle");
+              if (h) h.focus({ preventScroll: true });
+            }, function () {
+              btn.disabled = false;
+              btn.firstChild.textContent = "다시 시도";
+            });
           });
-        };
-        load();
+          moreBox.appendChild(btn);
+        }
+        renderMore();
+        renderToc(ctx, source);
+
+        if (kind === "haje" && haje) {
+          requestAnimationFrame(function () {
+            haje.scrollIntoView({ block: "start" });
+            var more = haje.querySelector("details");
+            if (more) more.open = true;
+            $("hajeH").focus({ preventScroll: true });
+          });
+        }
+      }, function () {
+        if (token === state.renderToken) showLoadError(load);
       });
+    };
+    load();
   }
 
   // reader:"article" -- one page per item, prev/next in date order
