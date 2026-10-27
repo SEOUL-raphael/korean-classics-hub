@@ -824,3 +824,7 @@ a.dayPill:hover { border-color: var(--accent); color: var(--accent); }
 .moreBtn:disabled { opacity: 0.6; cursor: progress; }
 .moreSub { font-size: 0.78rem; font-weight: 400; color: var(--muted); }
 .moreEnd { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.noTitle {
+  font-family: var(--font-sans); font-size: 0.72rem; font-weight: 500; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: 0.2em;
+}

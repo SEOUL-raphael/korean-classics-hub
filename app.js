@@ -912,7 +912,7 @@
       var heads = (text.match(/^## .+$/gm) || []).map(function (h) { return h.slice(3).trim(); });
       var routine = re ? heads.filter(function (h) { return re.test(h); }) : [];
       var main = heads.filter(function (h) { return !(re && re.test(h)); });
-      var first = main[0];
+      var first = main[0] && main[0].replace(/^\(제목 없음\)\s*/, "");
       if (!first) headEl.textContent = routine[0] || "기사 제목 없음";
       else headEl.textContent = isUntitled(first) ? "제목 없는 기사" + (main.length > 1 ? " 외 " + (main.length - 1) + "건" : "") : first + (main.length > 1 ? " 외 " + (main.length - 1) + "건" : "");
       routineEl.textContent = routine.length && first ? "반복 기록: " + routine[0] : "";
@@ -1417,7 +1417,15 @@
         var no = el("span", "entryNo", "기사 " + ctx.no);
         if (info["면/쪽"]) no.appendChild(el("span", "entryPage", " · " + info["면/쪽"].textContent.trim() + "면"));
         head.appendChild(no);
-        var h = el("h2", "entryTitle" + (untitled ? " untitled" : ""), title);
+        var h = el("h2", "entryTitle" + (untitled ? " untitled" : ""));
+        var derived = title.match(/^\(제목 없음\)\s*(.*)$/);
+        if (derived) {
+          // The data marks titles made from the translation's first line.
+          h.appendChild(el("span", "noTitle", "제목 없음"));
+          h.appendChild(document.createTextNode(" " + derived[1]));
+        } else {
+          h.textContent = title;
+        }
         h.tabIndex = -1;
         head.appendChild(h);
         entry.appendChild(head);
